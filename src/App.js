@@ -137,6 +137,7 @@ export default function App() {
     const payload = {
       ...formData,
       selection_date: formData.selection_date || null,
+      joining_date: formData.joining_date || null,
       recruiter: finalRecruiter,
       invoice_status: updatedInvoiceStatus
     };
@@ -244,7 +245,7 @@ export default function App() {
   const downloadSampleCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
-      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,,2026-10-15,35000,Joined,Joining confirmed\n"
+      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
       + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
@@ -290,7 +291,7 @@ export default function App() {
           client_poc: obj.client_poc || '',
           recruiter: obj.recruiter ? obj.recruiter.trim() : 'Sanchi',
           selection_date: obj.selection_date || null,
-          joining_date: obj.joining_date || new Date().toISOString().split('T')[0],
+          joining_date: obj.joining_date || null,
           revenue: obj.revenue || 0,
           status: statusVal,
           invoice_status: invStatus,
@@ -841,6 +842,11 @@ export default function App() {
                   </div>
 
                   <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Selection Date (Optional)</label>
+                    <input type="date" className="modern-input" value={formData.selection_date} onChange={(e) => setFormData({ ...formData, selection_date: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '10px' }}>
                     <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Joining Date *</label>
                     <input type="date" className="modern-input" value={formData.joining_date} onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
                   </div>
@@ -918,7 +924,7 @@ export default function App() {
                       <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569', fontWeight: '700' }}>
                         <th style={{ padding: '9px 10px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Candidate</th>
                         <th style={{ padding: '9px 10px' }}>Company & Process</th>
-                        <th style={{ padding: '9px 10px' }}>Joining</th>
+                        <th style={{ padding: '9px 10px' }}>Dates</th>
                         <th style={{ padding: '9px 10px' }}>Revenue</th>
                         <th style={{ padding: '9px 10px' }}>Stage</th>
                         <th style={{ padding: '9px 10px' }}>Invoice Status</th>
@@ -938,7 +944,10 @@ export default function App() {
                               <div style={{ fontWeight: '700', color: '#1e293b' }}>🏢 {item.company_name || 'N/A'}</div>
                               <div style={{ fontSize: '10px', color: '#475569' }}>Proc: {item.process_name || 'N/A'} • HR: {item.recruiter}</div>
                             </td>
-                            <td style={{ padding: '10px', fontSize: '11px', color: '#475569' }}>{item.joining_date}</td>
+                            <td style={{ padding: '10px', fontSize: '11px', color: '#475569' }}>
+                              {item.selection_date && <div>Sel: {item.selection_date}</div>}
+                              <div>Join: {item.joining_date || 'N/A'}</div>
+                            </td>
                             <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>Rs. {rev.toLocaleString('en-IN')}</td>
                             <td style={{ padding: '10px' }}>
                               <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', background: item.status === 'Joined' ? '#d1fae5' : '#fef3c7', color: item.status === 'Joined' ? '#065f46' : '#b45309' }}>
@@ -991,7 +1000,7 @@ export default function App() {
 
                           <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
                             <span>HR: <strong>{item.recruiter}</strong></span>
-                            <span>Joining: {item.joining_date}</span>
+                            <span>Join: {item.joining_date || 'N/A'}</span>
                           </div>
 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
@@ -1109,6 +1118,7 @@ export default function App() {
                 <p><strong>Company:</strong> {selectedCandidate.company_name || 'N/A'}</p>
                 <p><strong>Process:</strong> {selectedCandidate.process_name || 'N/A'}</p>
                 <p><strong>Internal HR:</strong> {selectedCandidate.recruiter || 'N/A'}</p>
+                <p><strong>Selection Date:</strong> {selectedCandidate.selection_date || 'N/A'}</p>
                 <p><strong>Joining Date:</strong> {selectedCandidate.joining_date || 'N/A'}</p>
                 <p><strong>Revenue:</strong> Rs. {parseFloat(selectedCandidate.revenue || 0).toLocaleString('en-IN')}</p>
                 <p><strong>Status:</strong> {selectedCandidate.status}</p>
