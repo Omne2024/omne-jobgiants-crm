@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import jsPDF from 'jspdf';
 
 // ⚠️ REPLACE WITH YOUR ACTUAL SUPABASE CREDENTIALS HERE
-const SUPABASE_URL = 'https://okreuewrtorwkyidoawx.supabase.co/rest/v1/';
+const SUPABASE_URL = 'https://okreuewrtorwkyidoawx.supabase.co/';
 const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
