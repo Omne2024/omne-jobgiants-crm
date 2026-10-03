@@ -1,329 +1,442 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import jsPDF from 'jspdf';
+
+// ⚠️ REPLACE WITH YOUR ACTUAL SUPABASE CREDENTIALS HERE
+const SUPABASE_URL = 'https://okreuewrtorwkyidoawx.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
 
-  // Candidates List State
-  const [candidates, setCandidates] = useState([
-    { id: 1, name: 'Rohan Sharma', recruiter: 'Amit Kumar', joiningDate: '2026-06-15', revenue: 25000, status: 'Joined', invoiceStatus: 'Ready to Invoice' },
-    { id: 2, name: 'Priya Verma', recruiter: 'Neha Singh', joiningDate: '2026-08-01', revenue: 30000, status: 'Joined', invoiceStatus: 'Pending' },
-  ]);
-
-  // Form States
+  // App Data States
+  const [candidates, setCandidates] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     recruiter: '',
-    joiningDate: '',
+    joining_date: '',
     revenue: '',
     status: 'Joined',
-    invoiceStatus: 'Pending'
+    invoice_status: 'Pending'
   });
 
-  const handleLogin = (e) => {
+  // Filter & Search States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterInvoiceStatus, setFilterInvoiceStatus] = useState('All');
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (session) {
+      fetchCandidates();
+    }
+  }, [session]);
+
+  // Fetch Candidates from Supabase
+  const fetchCandidates = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('*')
+      .order('joining_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching data:', error);
+    } else {
+      // Auto update 90 days invoice status
+      const today = new Date();
+      const updated = data.map((item) => {
+        const joinDate = new Date(item.joining_date);
+        const diffTime = Math.abs(today - joinDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        let autoInvoiceStatus = item.invoice_status;
+        if (diffDays >= 90 && item.invoice_status === 'Pending') {
+          autoInvoiceStatus = 'Ready to Invoice';
+        }
+
+        return { ...item, invoice_status: autoInvoiceStatus };
+      });
+      setCandidates(updated);
+    }
+    setLoading(false);
+  };
+
+  // Auth Handlers
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (email && password) {
-      setIsAuthenticated(true);
+    setAuthMessage('Sending Magic Link to your email...');
+    const { error } = await supabase.auth.signInWithOtp({ email: authEmail });
+    if (error) {
+      setAuthMessage('Error: ' + error.message);
+    } else {
+      setAuthMessage('Check your email for the login link!');
     }
   };
 
-  // Calculate 90 Days Auto Status
-  const check90Days = (joiningDateStr) => {
-    if (!joiningDateStr) return 'Pending';
-    const joiningDate = new Date(joiningDateStr);
-    const today = new Date();
-    const diffTime = Math.abs(today - joiningDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays >= 90 ? 'Ready to Invoice' : 'Pending';
+  const handleLogout = () => {
+    supabase.auth.signOut();
   };
 
-  // Add or Edit Candidate Submit Handler
-  const handleSubmit = (e) => {
+  // CRUD Handlers
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    const autoInvoiceStatus = check90Days(formData.joiningDate);
+    if (!formData.name || !formData.recruiter || !formData.joining_date || !formData.revenue) {
+      alert('Please fill all required fields');
+      return;
+    }
 
     if (isEditing) {
-      setCandidates(candidates.map(c => c.id === currentId ? { 
-        ...formData, 
-        id: currentId, 
-        revenue: Number(formData.revenue),
-        invoiceStatus: autoInvoiceStatus 
-      } : c));
-      setIsEditing(false);
-      setCurrentId(null);
+      const { error } = await supabase
+        .from('candidates')
+        .update(formData)
+        .eq('id', currentId);
+
+      if (error) alert(error.message);
     } else {
-      const newCandidate = {
-        ...formData,
-        id: Date.now(),
-        revenue: Number(formData.revenue),
-        invoiceStatus: autoInvoiceStatus
-      };
-      setCandidates([...candidates, newCandidate]);
+      const { error } = await supabase
+        .from('candidates')
+        .insert([{ ...formData, user_email: session.user.email }]);
+
+      if (error) alert(error.message);
     }
 
-    setFormData({ name: '', recruiter: '', joiningDate: '', revenue: '', status: 'Joined', invoiceStatus: 'Pending' });
+    setFormData({ name: '', recruiter: '', joining_date: '', revenue: '', status: 'Joined', invoice_status: 'Pending' });
+    setIsEditing(false);
+    setCurrentId(null);
+    fetchCandidates();
   };
 
-  // Edit Button Click
   const handleEdit = (candidate) => {
     setIsEditing(true);
     setCurrentId(candidate.id);
     setFormData({
       name: candidate.name,
       recruiter: candidate.recruiter,
-      joiningDate: candidate.joiningDate,
+      joining_date: candidate.joining_date,
       revenue: candidate.revenue,
       status: candidate.status,
-      invoiceStatus: candidate.invoiceStatus
+      invoice_status: candidate.invoice_status
     });
   };
 
-  // Delete Candidate
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this entry?')) {
-      setCandidates(candidates.filter(c => c.id !== id));
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this candidate record?')) {
+      const { error } = await supabase.from('candidates').delete().eq('id', id);
+      if (error) alert(error.message);
+      else fetchCandidates();
     }
   };
 
-  // KPI Calculations
-  const readyToInvoiceList = candidates.filter(c => check90Days(c.joiningDate) === 'Ready to Invoice');
-  const totalRevenue = candidates.reduce((acc, curr) => acc + Number(curr.revenue || 0), 0);
+  // PDF Invoice Generator
+  const generateInvoicePDF = (candidate) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(40, 40, 40);
+    doc.text('OMNE JOBGIANTS CONSULTANCY SERVICES', 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('Recruitment & Talent Acquisition Solutions', 14, 28);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 28);
+    
+    doc.line(14, 32, 196, 32);
 
-  // Leaderboard Calculation
-  const leaderboard = Object.values(
-    candidates.reduce((acc, curr) => {
-      if (!acc[curr.recruiter]) {
-        acc[curr.recruiter] = { name: curr.recruiter, placements: 0, revenue: 0 };
-      }
-      acc[curr.recruiter].placements += 1;
-      acc[curr.recruiter].revenue += Number(curr.revenue || 0);
-      return acc;
-    }, {})
-  ).sort((a, b) => b.revenue - a.revenue);
+    // Invoice Details
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text('PLACEMENT INVOICE', 14, 45);
 
-  if (!isAuthenticated) {
+    doc.setFontSize(11);
+    doc.text(`Candidate Name: ${candidate.name}`, 14, 58);
+    doc.text(`Recruiter Assigned: ${candidate.recruiter}`, 14, 66);
+    doc.text(`Joining Date: ${candidate.joining_date}`, 14, 74);
+    doc.text(`Status: 90 Days Completed`, 14, 82);
+
+    // Financial Table
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, 95, 182, 10, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description', 18, 101);
+    doc.text('Amount (INR)', 150, 101);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Recruitment Fee for ${candidate.name}`, 18, 113);
+    doc.text(`Rs. ${parseFloat(candidate.revenue).toLocaleString('en-IN')}`, 150, 113);
+
+    doc.line(14, 122, 196, 122);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Amount Due:', 100, 130);
+    doc.text(`Rs. ${parseFloat(candidate.revenue).toLocaleString('en-IN')}`, 150, 130);
+
+    // Footer
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(120);
+    doc.text('Thank you for partnering with Omne JobGiants Consultancy Services.', 14, 160);
+
+    doc.save(`Invoice_${candidate.name.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  // Filtered List
+  const filteredCandidates = candidates.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          item.recruiter.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterInvoiceStatus === 'All' || item.invoice_status === filterInvoiceStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-        <div className="bg-slate-800 p-8 rounded-xl border border-slate-700 w-full max-w-md shadow-2xl">
-          <h1 className="text-2xl font-bold text-blue-400 text-center mb-2">Omne JobGiants</h1>
-          <p className="text-slate-400 text-center text-sm mb-6">Recruitment Consultancy CRM Portal</p>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">Partner Email</label>
-              <input 
-                type="email" 
-                required 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="partner@jobgiants.com"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">Password</label>
-              <input 
-                type="password" 
-                required 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 font-semibold py-3 rounded-lg text-sm transition">
-              Login to CRM
-            </button>
-          </form>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
+        <h3>Loading Omne JobGiants CRM...</h3>
       </div>
     );
   }
 
+  // LOGIN SCREEN
+  if (!session) {
+    return (
+      <div style={{ maxWidth: '400px', margin: '80px auto', padding: '30px', border: '1px solid #e0e0e0', borderRadius: '8px', fontFamily: 'sans-serif', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+        <h2 style={{ color: '#16a34a', marginTop: 0 }}>Omne JobGiants CRM</h2>
+        <p style={{ color: '#666', fontSize: '14px' }}>Sign in via Email Magic Link to access candidate data.</p>
+        <form onSubmit={handleLogin}>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px' }}>Email Address</label>
+            <input
+              type="email"
+              placeholder="your-email@gmail.com"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+              required
+              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+            />
+          </div>
+          <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Send Magic Link
+          </button>
+        </form>
+        {authMessage && <p style={{ marginTop: '15px', fontSize: '13px', color: '#2563eb' }}>{authMessage}</p>}
+      </div>
+    );
+  }
+
+  // MAIN DASHBOARD SCREEN
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
       {/* Header */}
-      <header className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '15px 25px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <div>
-          <h1 className="text-2xl font-bold text-blue-400">Omne JobGiants Recruitment Consultancy</h1>
-          <p className="text-xs text-slate-400 mt-1">Logged in as: {email}</p>
+          <h1 style={{ margin: 0, fontSize: '22px', color: '#111827' }}>Omne JobGiants Consultancy Services</h1>
+          <span style={{ fontSize: '12px', color: '#6b7280' }}>LoggedIn as: {session.user.email}</span>
         </div>
-        <button onClick={() => setIsAuthenticated(false)} className="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg text-xs font-semibold">
+        <button onClick={handleLogout} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
           Logout
         </button>
-      </header>
+      </div>
 
-      {/* 90-Day Alert Banner */}
-      {readyToInvoiceList.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xl">🔔</span>
-            <div>
-              <h4 className="font-semibold text-amber-400">90-Day Completion Alert!</h4>
-              <p className="text-xs text-slate-300">{readyToInvoiceList.length} candidate(s) completed 90 days. Ready for Invoicing!</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+        {/* Form Column */}
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', height: 'fit-content' }}>
+          <h3 style={{ marginTop: 0, color: '#1f2937' }}>{isEditing ? 'Edit Candidate' : 'Add New Candidate'}</h3>
+          <form onSubmit={handleFormSubmit}>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Candidate Name *</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. Rahul Sharma"
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Recruiter Name *</label>
+              <input
+                type="text"
+                value={formData.recruiter}
+                onChange={(e) => setFormData({ ...formData, recruiter: e.target.value })}
+                placeholder="e.g. Amit Kumar"
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Joining Date *</label>
+              <input
+                type="date"
+                value={formData.joining_date}
+                onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Revenue / Fee (INR) *</label>
+              <input
+                type="number"
+                value={formData.revenue}
+                onChange={(e) => setFormData({ ...formData, revenue: e.target.value })}
+                placeholder="e.g. 35000"
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Invoice Status</label>
+              <select
+                value={formData.invoice_status}
+                onChange={(e) => setFormData({ ...formData, invoice_status: e.target.value })}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+              >
+                <option value="Pending">Pending (Under 90 Days)</option>
+                <option value="Ready to Invoice">Ready to Invoice (90 Days Done)</option>
+                <option value="Invoiced">Invoiced / Sent</option>
+                <option value="Paid">Paid</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+              <button type="submit" style={{ flex: 1, padding: '10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                {isEditing ? 'Update Candidate' : 'Save Candidate'}
+              </button>
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setFormData({ name: '', recruiter: '', joining_date: '', revenue: '', status: 'Joined', invoice_status: 'Pending' });
+                  }}
+                  style={{ padding: '10px', backgroundColor: '#6b7280', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* Candidate List Column */}
+        <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0, color: '#1f2937' }}>Candidate Placement Records ({filteredCandidates.length})</h3>
+            
+            {/* Search & Filters */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="Search Candidate / Recruiter..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' }}
+              />
+              <select
+                value={filterInvoiceStatus}
+                onChange={(e) => setFilterInvoiceStatus(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '13px' }}
+              >
+                <option value="All">All Invoices</option>
+                <option value="Pending">Pending</option>
+                <option value="Ready to Invoice">Ready to Invoice</option>
+                <option value="Invoiced">Invoiced</option>
+                <option value="Paid">Paid</option>
+              </select>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-          <p className="text-xs text-slate-400 font-medium">Total Revenue Generated</p>
-          <h3 className="text-2xl font-bold text-emerald-400 mt-1">₹{totalRevenue.toLocaleString('en-IN')}</h3>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-          <p className="text-xs text-slate-400 font-medium">Total Placements</p>
-          <h3 className="text-2xl font-bold text-blue-400 mt-1">{candidates.length}</h3>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
-          <p className="text-xs text-slate-400 font-medium">Ready To Invoice (90 Days)</p>
-          <h3 className="text-2xl font-bold text-amber-400 mt-1">{readyToInvoiceList.length}</h3>
-        </div>
-      </div>
-
-      {/* Entry Form: Add / Edit Candidate */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl mb-8">
-        <h3 className="text-lg font-bold mb-4 text-blue-400">
-          {isEditing ? '✏️ Edit Candidate Details' : '➕ Add New Selected Candidate'}
-        </h3>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Candidate Name</label>
-            <input 
-              type="text" 
-              required 
-              value={formData.name} 
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-              placeholder="Full Name" 
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Recruiter Name</label>
-            <input 
-              type="text" 
-              required 
-              value={formData.recruiter} 
-              onChange={(e) => setFormData({...formData, recruiter: e.target.value})}
-              placeholder="Employee/Partner Name" 
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Joining Date</label>
-            <input 
-              type="date" 
-              required 
-              value={formData.joiningDate} 
-              onChange={(e) => setFormData({...formData, joiningDate: e.target.value})}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Revenue Amount (₹)</label>
-            <input 
-              type="number" 
-              required 
-              value={formData.revenue} 
-              onChange={(e) => setFormData({...formData, revenue: e.target.value})}
-              placeholder="e.g. 25000" 
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="flex items-end gap-2">
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold p-2.5 rounded-lg text-xs transition">
-              {isEditing ? 'Save Changes' : 'Add Candidate'}
-            </button>
-            {isEditing && (
-              <button 
-                type="button" 
-                onClick={() => {
-                  setIsEditing(false);
-                  setFormData({ name: '', recruiter: '', joiningDate: '', revenue: '', status: 'Joined', invoiceStatus: 'Pending' });
-                }} 
-                className="bg-slate-700 hover:bg-slate-600 text-white font-semibold p-2.5 rounded-lg text-xs"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Table Area */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-xl">
-          <h3 className="text-lg font-bold mb-4 text-slate-200">Candidate Lifecycle Tracker</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-400">
-              <thead className="text-xs uppercase bg-slate-800/50 text-slate-300">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f3f4f6', textAlign: 'left' }}>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Candidate</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Recruiter</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Joining Date</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Revenue</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Invoice Status</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCandidates.length === 0 ? (
                 <tr>
-                  <th className="p-3">Candidate</th>
-                  <th className="p-3">Recruiter</th>
-                  <th className="p-3">Joining Date</th>
-                  <th className="p-3">Revenue</th>
-                  <th className="p-3">90-Day Invoice Alert</th>
-                  <th className="p-3">Actions</th>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#9ca3af' }}>No candidate records found.</td>
                 </tr>
-              </thead>
-              <tbody>
-                {candidates.map((c) => {
-                  const invStatus = check90Days(c.joiningDate);
-                  return (
-                    <tr key={c.id} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                      <td className="p-3 font-medium text-slate-200">{c.name}</td>
-                      <td className="p-3">{c.recruiter}</td>
-                      <td className="p-3">{c.joiningDate}</td>
-                      <td className="p-3 text-emerald-400">₹{Number(c.revenue).toLocaleString('en-IN')}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-md text-xs font-semibold ${invStatus === 'Ready to Invoice' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-blue-500/20 text-blue-400'}`}>
-                          {invStatus}
-                        </span>
-                      </td>
-                      <td className="p-3 flex gap-2">
-                        <button onClick={() => handleEdit(c)} className="bg-slate-800 hover:bg-slate-700 text-blue-400 p-1.5 rounded text-xs">
-                          ✏️ Edit
+              ) : (
+                filteredCandidates.map((item) => (
+                  <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '10px', fontWeight: 'bold' }}>{item.name}</td>
+                    <td style={{ padding: '10px' }}>{item.recruiter}</td>
+                    <td style={{ padding: '10px' }}>{item.joining_date}</td>
+                    <td style={{ padding: '10px' }}>Rs. {parseFloat(item.revenue).toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '10px' }}>
+                      <span
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          backgroundColor:
+                            item.invoice_status === 'Ready to Invoice' ? '#fef3c7' :
+                            item.invoice_status === 'Paid' ? '#dcfce7' :
+                            item.invoice_status === 'Invoiced' ? '#e0e7ff' : '#f3f4f6',
+                          color:
+                            item.invoice_status === 'Ready to Invoice' ? '#d97706' :
+                            item.invoice_status === 'Paid' ? '#15803d' :
+                            item.invoice_status === 'Invoiced' ? '#4338ca' : '#374151'
+                        }}
+                      >
+                        {item.invoice_status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {item.invoice_status === 'Ready to Invoice' && (
+                          <button
+                            onClick={() => generateInvoicePDF(item)}
+                            style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+                          >
+                            PDF Invoice
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleEdit(item)}
+                          style={{ backgroundColor: '#f3f4f6', border: '1px solid #ccc', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+                        >
+                          Edit
                         </button>
-                        <button onClick={() => handleDelete(c.id)} className="bg-slate-800 hover:bg-slate-700 text-rose-400 p-1.5 rounded text-xs">
-                          🗑️ Delete
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          style={{ backgroundColor: '#fee2e2', color: '#991b1b', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
+                        >
+                          Del
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Leaderboard */}
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
-          <h3 className="text-lg font-bold mb-4 text-slate-200">Employee Leaderboard</h3>
-          <div className="space-y-4">
-            {leaderboard.map((emp, index) => (
-              <div key={emp.name} className="flex items-center justify-between p-3 bg-slate-800/40 rounded-lg border border-slate-800">
-                <div className="flex items-center gap-3">
-                  <span className={`font-bold text-sm ${index === 0 ? 'text-amber-400' : 'text-slate-400'}`}>
-                    #{index + 1}
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-200 text-sm">{emp.name}</p>
-                    <p className="text-xs text-slate-400">{emp.placements} Placements</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-emerald-400 text-sm">₹{emp.revenue.toLocaleString('en-IN')}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
