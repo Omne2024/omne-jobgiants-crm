@@ -15,6 +15,7 @@ export default function App() {
   const [selectedRoleType, setSelectedRoleType] = useState('Partner');
 
   const [candidates, setCandidates] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   
@@ -63,6 +64,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [selectedReportMonth, setSelectedReportMonth] = useState('All');
+  const [hrSelectedReportMonth, setHrSelectedReportMonth] = useState('All');
   
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [paymentModalCandidate, setPaymentModalCandidate] = useState(null);
@@ -76,6 +78,9 @@ export default function App() {
   useEffect(() => {
     if (isLoggedIn) {
       fetchCandidates();
+      if (userRole === 'Partner') {
+        fetchAuditLogs();
+      }
     }
   }, [isLoggedIn]);
 
@@ -112,7 +117,7 @@ export default function App() {
       const base64Image = event.target.result;
       setCompanyLogo(base64Image);
       localStorage.setItem('crm_custom_logo', base64Image);
-      alert("Logo successfully update ho gaya hai!");
+      alert("Logo successfully updated!");
     };
     reader.readAsDataURL(file);
   };
@@ -150,6 +155,13 @@ export default function App() {
     }
   };
 
+  const fetchAuditLogs = async () => {
+    const { data, error } = await supabase.from('audit_logs').select('*').order('action_timestamp', { ascending: false });
+    if (!error && data) {
+      setAuditLogs(data);
+    }
+  };
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
@@ -157,7 +169,7 @@ export default function App() {
     let finalRecruiter = userRole === 'HR' ? loggedInHRName : (isOtherSelected ? otherRecruiterInput.trim() : formData.recruiter);
     
     if (!finalRecruiter) {
-      alert("Kripya Internal HR ka naam select karein ya enter karein.");
+      alert("Please select or enter the Internal HR name.");
       return;
     }
 
@@ -166,7 +178,6 @@ export default function App() {
       updatedInvoiceStatus = 'Cancelled';
     }
 
-    // Safely formatting dates to avoid empty string syntax errors in Supabase
     const cleanSelectionDate = formData.selection_date && formData.selection_date.trim() !== '' ? formData.selection_date : null;
     const cleanJoiningDate = formData.joining_date && formData.joining_date.trim() !== '' ? formData.joining_date : null;
     const cleanPaymentDate = formData.payment_date && formData.payment_date.trim() !== '' ? formData.payment_date : null;
@@ -199,9 +210,9 @@ export default function App() {
 
     if (response && response.error) {
       console.error("Supabase Save Error:", response.error);
-      alert("Save nahi ho paya: " + response.error.message);
+      alert("Failed to save: " + response.error.message);
     } else {
-      alert(userRole === 'HR' ? "Candidate successfully submit ho gaya aapke CRM mein!" : "Candidate successfully save ho gaya!");
+      alert("Candidate successfully saved!");
       setFormData({ 
         name: '', 
         email: '',
@@ -241,7 +252,7 @@ export default function App() {
     const { error } = await supabase.from('candidates').update(payload).eq('id', paymentModalCandidate.id);
 
     if (error) {
-      alert("Payment update karne mein error aaya: " + error.message);
+      alert("Error updating payment: " + error.message);
     } else {
       alert("Invoice successfully marked as Paid!");
       setPaymentModalCandidate(null);
@@ -253,11 +264,11 @@ export default function App() {
   const handleBatchInvoiceSubmit = async (e) => {
     e.preventDefault();
     if (!batchInvoiceNumber.trim()) {
-      alert("Kripya valid Invoice Number daalein.");
+      alert("Please enter a valid Invoice Number.");
       return;
     }
     if (selectedForBatchInvoice.length === 0) {
-      alert("Kripya kam se kam ek candidate select karein.");
+      alert("Please select at least one candidate.");
       return;
     }
 
@@ -270,9 +281,9 @@ export default function App() {
       .in('id', selectedForBatchInvoice);
 
     if (error) {
-      alert("Batch invoice update karne mein error aaya: " + error.message);
+      alert("Error updating batch invoice: " + error.message);
     } else {
-      alert(`Invoice ${batchInvoiceNumber} successfully generate ho gaya selected candidates ke liye!`);
+      alert(`Invoice ${batchInvoiceNumber} successfully generated for selected candidates!`);
       setShowInvoiceModal(false);
       setBatchInvoiceNumber('');
       setSelectedForBatchInvoice([]);
@@ -280,15 +291,59 @@ export default function App() {
     }
   };
 
-  const handleDeleteCandidate = async (id) => {
-    if (window.confirm("Kya aap sach mein is candidate ko delete karna chahte hain?")) {
-      const { error } = await supabase.from('candidates').delete().eq('id', id);
+  const handleDeleteCandidate = async (candidate, itemCreationDate) => {
+    if (userRole === 'HR' && itemCreationDate) {
+      const entryDate = new Date(itemCreationDate);
+      const today = new Date();
+      const diffTime = Math.abs(today - entryDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 90) {
+        alert("You can only edit or delete entries created within the last 90 days.");
+        return;
+      }
+    }
+
+    if (window.confirm(`Are you sure you want to delete candidate ${candidate.name}?`)) {
+      const { error } = await supabase.from('candidates').delete().eq('id', candidate.id);
       if (error) {
-        alert("Delete nahi ho paya: " + error.message);
+        alert("Failed to delete: " + error.message);
       } else {
+        // If deleted by Partner, record audit log entry
+        if (userRole === 'Partner') {
+          const nowObj = new Date();
+          const logPayload = {
+            partner_email: loginEmail.trim().toLowerCase(),
+            action_type: 'DELETE',
+            candidate_name: candidate.name,
+            candidate_company: candidate.company_name || 'N/A',
+            action_timestamp: nowObj.toISOString()
+          };
+          
+          await supabase.from('audit_logs').insert([logPayload]);
+          fetchAuditLogs();
+        }
+
         fetchCandidates();
       }
     }
+  };
+
+  const handleEditClick = (item) => {
+    if (userRole === 'HR' && item.created_at) {
+      const entryDate = new Date(item.created_at);
+      const today = new Date();
+      const diffTime = Math.abs(today - entryDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 90) {
+        alert("You can only edit or delete entries created within the last 90 days.");
+        return;
+      }
+    }
+
+    setIsEditing(true);
+    setCurrentId(item.id);
+    setFormData(item);
+    setIsOtherSelected(false);
   };
 
   const downloadSampleCSV = () => {
@@ -310,6 +365,8 @@ export default function App() {
     const file = e.target.files[0];
     if (!file) return;
 
+    const loggedInHRName = userRole === 'HR' ? hrDatabase[loginEmail.trim().toLowerCase()]?.name : '';
+
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target.result;
@@ -330,6 +387,7 @@ export default function App() {
 
         const statusVal = obj.status || 'Yet to Join';
         const invStatus = (statusVal === 'Dropped' || statusVal === 'Rejected') ? 'Cancelled' : 'Pending';
+        const rowRecruiter = userRole === 'HR' ? loggedInHRName : (obj.recruiter ? obj.recruiter.trim() : 'Sanchi');
 
         batchData.push({
           name: obj.name || 'Unknown',
@@ -338,10 +396,10 @@ export default function App() {
           company_name: obj.company_name || 'Transom',
           process_name: obj.process_name || 'General',
           client_poc: obj.client_poc || '',
-          recruiter: obj.recruiter ? obj.recruiter.trim() : 'Sanchi',
+          recruiter: rowRecruiter,
           selection_date: obj.selection_date || null,
           joining_date: obj.joining_date || null,
-          revenue: obj.revenue || 0,
+          revenue: userRole === 'HR' ? 0 : (obj.revenue || 0),
           status: statusVal,
           invoice_status: invStatus,
           notes: obj.notes || ''
@@ -351,13 +409,13 @@ export default function App() {
       if (batchData.length > 0) {
         const { error } = await supabase.from('candidates').insert(batchData);
         if (error) {
-          alert("Bulk upload mein error aaya: " + error.message);
+          alert("Bulk upload error: " + error.message);
         } else {
-          alert(`Successfully ${batchData.length} candidates upload ho gaye hain!`);
+          alert(`Successfully uploaded ${batchData.length} candidates!`);
           fetchCandidates();
         }
       } else {
-        alert("File mein valid data nahi mila ya format galat hai.");
+        alert("No valid data found in file or incorrect format.");
       }
     };
     reader.readAsText(file);
@@ -401,7 +459,7 @@ export default function App() {
   const sendHRPerformanceEmail = (hrName, monthKey, hrData) => {
     const hrEmail = hrEmailDirectory[hrName] || '';
     if (!hrEmail) {
-      alert(`Kripya ${hrName} ka valid email address configure karein.`);
+      alert(`Please configure a valid email address for ${hrName}.`);
       return;
     }
 
@@ -468,6 +526,37 @@ export default function App() {
     const matchesHR = userRole === 'HR' ? item.recruiter === currentLoggedInHRName : (filterHR === 'All' || item.recruiter === filterHR);
 
     return matchesSearch && matchesStatus && matchesStage && matchesHR;
+  });
+
+  // HR specific monthly breakdown computation
+  const hrCandidatesList = candidates.filter(item => userRole === 'HR' && item.recruiter === currentLoggedInHRName);
+  const hrMonthlyBreakdown = {};
+  hrCandidatesList.forEach(item => {
+    const dateToUse = item.joining_date || item.selection_date;
+    if (!dateToUse) return;
+    const dateObj = new Date(dateToUse);
+    const monthKey = isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    if (!hrMonthlyBreakdown[monthKey]) {
+      hrMonthlyBreakdown[monthKey] = {
+        total: 0,
+        selected: 0,
+        joined: 0,
+        dropped: 0,
+        rejected: 0,
+        yetToJoin: 0,
+        candidates: []
+      };
+    }
+
+    hrMonthlyBreakdown[monthKey].total += 1;
+    hrMonthlyBreakdown[monthKey].candidates.push(item);
+
+    if (item.status === 'Selected') hrMonthlyBreakdown[monthKey].selected += 1;
+    else if (item.status === 'Joined') hrMonthlyBreakdown[monthKey].joined += 1;
+    else if (item.status === 'Dropped') hrMonthlyBreakdown[monthKey].dropped += 1;
+    else if (item.status === 'Rejected') hrMonthlyBreakdown[monthKey].rejected += 1;
+    else if (item.status === 'Yet to Join') hrMonthlyBreakdown[monthKey].yetToJoin += 1;
   });
 
   const monthlyData = {};
@@ -745,6 +834,41 @@ export default function App() {
                     style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
                     Reports
                   </button>
+                  <button 
+                    onClick={() => setActiveTab('audit')} 
+                    style={{ padding: '6px 10px', background: activeTab === 'audit' ? '#fff' : 'transparent', color: activeTab === 'audit' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
+                    Audit History
+                  </button>
+                </div>
+              </>
+            )}
+
+            {userRole === 'HR' && (
+              <>
+                <button 
+                  onClick={downloadSampleCSV} 
+                  style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                  title="Download Sample CSV Template"
+                >
+                  📥 CSV Template
+                </button>
+
+                <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }} title="Upload Bulk Candidates via CSV">
+                  📂 Bulk Upload
+                  <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+                </label>
+
+                <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px', gap: '2px' }}>
+                  <button 
+                    onClick={() => setActiveTab('dashboard')} 
+                    style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
+                    Dash
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('reports')} 
+                    style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
+                    Reports
+                  </button>
                 </div>
               </>
             )}
@@ -782,88 +906,198 @@ export default function App() {
           </div>
         )}
 
-        {/* REPORTS TAB (Partner Only) */}
-        {userRole === 'Partner' && activeTab === 'reports' ? (
+        {/* AUDIT HISTORY TAB (Partner Only) */}
+        {userRole === 'Partner' && activeTab === 'audit' ? (
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+            <h2 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>
+              🛡️ Partner Portal Activity & Deletion Audit History
+            </h2>
+            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
+              Yeh log track karta hai ki kis partner email se kis candidate ko kab aur kitne baje delete kiya gaya hai.
+            </p>
+
+            {auditLogs.length === 0 ? (
+              <p style={{ color: '#64748b', fontSize: '13px' }}>No deletion or action history recorded yet.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569', fontWeight: '700' }}>
+                      <th style={{ padding: '10px' }}>Partner Email</th>
+                      <th style={{ padding: '10px' }}>Action Type</th>
+                      <th style={{ padding: '10px' }}>Candidate Name</th>
+                      <th style={{ padding: '10px' }}>Company</th>
+                      <th style={{ padding: '10px' }}>Date & Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log) => {
+                      const dt = new Date(log.action_timestamp);
+                      const formattedDate = isNaN(dt) ? log.action_timestamp : dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' });
+                      return (
+                        <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px', fontWeight: '700', color: '#4f46e5' }}>{log.partner_email}</td>
+                          <td style={{ padding: '10px' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '10px', fontWeight: '700', background: '#fee2e2', color: '#991b1b', fontSize: '10px' }}>
+                              {log.action_type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>{log.candidate_name}</td>
+                          <td style={{ padding: '10px', color: '#334155' }}>{log.candidate_company}</td>
+                          <td style={{ padding: '10px', color: '#64748b', fontSize: '11px' }}>{formattedDate}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'reports' ? (
           <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-              <h2 style={{ margin: 0, color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>Month-wise Revenue & HR Performance</h2>
+              <h2 style={{ margin: 0, color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>
+                {userRole === 'HR' ? '📊 Your Month-Wise Performance Reports' : 'Month-wise Revenue & HR Performance'}
+              </h2>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>Filter Month:</label>
                 <select 
                   className="modern-input" 
-                  value={selectedReportMonth} 
-                  onChange={(e) => setSelectedReportMonth(e.target.value)} 
+                  value={userRole === 'HR' ? hrSelectedReportMonth : selectedReportMonth} 
+                  onChange={(e) => userRole === 'HR' ? setHrSelectedReportMonth(e.target.value) : setSelectedReportMonth(e.target.value)} 
                   style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff', fontWeight: '700' }}
                 >
                   <option value="All">All Months</option>
-                  {Object.keys(monthlyData).map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
+                  {userRole === 'HR' ? (
+                    Object.keys(hrMonthlyBreakdown).map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))
+                  ) : (
+                    Object.keys(monthlyData).map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
 
-            {Object.keys(monthlyData).length === 0 ? (
-              <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
-            ) : (
-              Object.keys(monthlyData)
-                .filter(month => selectedReportMonth === 'All' || month === selectedReportMonth)
-                .map((month) => {
-                  const mData = monthlyData[month];
-                  const sortedHRs = Object.keys(mData.recruiters).sort((a, b) => mData.recruiters[b].revenue - mData.recruiters[a].revenue);
-                  const topHRName = sortedHRs[0] || 'N/A';
+            {/* HR Reports View */}
+            {userRole === 'HR' ? (
+              Object.keys(hrMonthlyBreakdown).length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
+              ) : (
+                Object.keys(hrMonthlyBreakdown)
+                  .filter(month => hrSelectedReportMonth === 'All' || month === hrSelectedReportMonth)
+                  .map((month) => {
+                    const mData = hrMonthlyBreakdown[month];
+                    return (
+                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                          <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
+                          <div style={{ display: 'flex', gap: '8px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
+                            <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 8px', borderRadius: '6px' }}>Total: {mData.total}</span>
+                            <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '4px 8px', borderRadius: '6px' }}>Selected: {mData.selected}</span>
+                            <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 8px', borderRadius: '6px' }}>Joined: {mData.joined}</span>
+                            <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 8px', borderRadius: '6px' }}>Dropped: {mData.dropped}</span>
+                            <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 8px', borderRadius: '6px' }}>Rejected: {mData.rejected}</span>
+                          </div>
+                        </div>
 
-                  return (
-                    <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                        <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
-                        <div style={{ display: 'flex', gap: '10px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
-                          <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '6px' }}>Total Rev: Rs. {mData.totalRevenue.toLocaleString('en-IN')}</span>
-                          <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: '6px' }}>Total Selections: {mData.joinedCount}</span>
-                          <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '6px' }}>Total Drops: {mData.droppedCount}</span>
-                          <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: '6px' }}>🏆 Top HR: {topHRName}</span>
+                        <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#334155', fontWeight: '700' }}>Candidates List for {month}:</h4>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                            <thead>
+                              <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569' }}>
+                                <th style={{ padding: '8px' }}>Candidate Name</th>
+                                <th style={{ padding: '8px' }}>Company & Process</th>
+                                <th style={{ padding: '8px' }}>Joining Date</th>
+                                <th style={{ padding: '8px' }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {mData.candidates.map(c => (
+                                <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '8px', fontWeight: '700', color: '#0f172a' }}>{c.name}</td>
+                                  <td style={{ padding: '8px' }}>{c.company_name} ({c.process_name})</td>
+                                  <td style={{ padding: '8px' }}>{c.joining_date || 'N/A'}</td>
+                                  <td style={{ padding: '8px' }}>
+                                    <span style={{ padding: '2px 6px', borderRadius: '10px', fontWeight: '700', background: c.status === 'Joined' ? '#d1fae5' : '#fef3c7', color: c.status === 'Joined' ? '#065f46' : '#b45309' }}>
+                                      {c.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
+                    );
+                  })
+              )
+            ) : (
+              // Partner Reports View
+              Object.keys(monthlyData).length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
+              ) : (
+                Object.keys(monthlyData)
+                  .filter(month => selectedReportMonth === 'All' || month === selectedReportMonth)
+                  .map((month) => {
+                    const mData = monthlyData[month];
+                    const sortedHRs = Object.keys(mData.recruiters).sort((a, b) => mData.recruiters[b].revenue - mData.recruiters[a].revenue);
+                    const topHRName = sortedHRs[0] || 'N/A';
 
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#334155', fontWeight: '700' }}>HR Individual Performance & 1-Click Monthly Reports:</h4>
-                      
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                        {Object.keys(mData.recruiters).map(hrName => {
-                          const hrStats = mData.recruiters[hrName];
-                          const hasEmailRegistered = hrEmailDirectory[hrName];
+                    return (
+                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                          <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
+                          <div style={{ display: 'flex', gap: '10px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
+                            <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '6px' }}>Total Rev: Rs. {mData.totalRevenue.toLocaleString('en-IN')}</span>
+                            <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: '6px' }}>Total Selections: {mData.joinedCount}</span>
+                            <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '6px' }}>Total Drops: {mData.droppedCount}</span>
+                            <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: '6px' }}>🏆 Top HR: {topHRName}</span>
+                          </div>
+                        </div>
 
-                          return (
-                            <div key={hrName} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                              <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                  <strong style={{ fontSize: '13px', color: '#0f172a' }}>👤 {hrName}</strong>
-                                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#059669', background: '#d1fae5', padding: '2px 6px', borderRadius: '4px' }}>Rs. {hrStats.revenue.toLocaleString('en-IN')}</span>
+                        <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#334155', fontWeight: '700' }}>HR Individual Performance & 1-Click Monthly Reports:</h4>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                          {Object.keys(mData.recruiters).map(hrName => {
+                            const hrStats = mData.recruiters[hrName];
+                            const hasEmailRegistered = hrEmailDirectory[hrName];
+
+                            return (
+                              <div key={hrName} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                <div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>👤 {hrName}</strong>
+                                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#059669', background: '#d1fae5', padding: '2px 6px', borderRadius: '4px' }}>Rs. {hrStats.revenue.toLocaleString('en-IN')}</span>
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#475569', marginBottom: '8px', display: 'flex', gap: '12px' }}>
+                                    <span>Joined/Selected: <strong>{hrStats.joined}</strong></span>
+                                    <span>Dropped: <strong style={{ color: '#ef4444' }}>{hrStats.dropped}</strong></span>
+                                  </div>
                                 </div>
-                                <div style={{ fontSize: '11px', color: '#475569', marginBottom: '8px', display: 'flex', gap: '12px' }}>
-                                  <span>Joined/Selected: <strong>{hrStats.joined}</strong></span>
-                                  <span>Dropped: <strong style={{ color: '#ef4444' }}>{hrStats.dropped}</strong></span>
-                                </div>
+
+                                {hasEmailRegistered ? (
+                                  <button 
+                                    onClick={() => sendHRPerformanceEmail(hrName, month, hrStats)}
+                                    style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}
+                                    title={`Send performance report to ${hrName}`}
+                                  >
+                                    ✉️ Email Report to {hrName}
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', marginTop: '6px' }}>Email not configured</span>
+                                )}
                               </div>
-
-                              {hasEmailRegistered ? (
-                                <button 
-                                  onClick={() => sendHRPerformanceEmail(hrName, month, hrStats)}
-                                  style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}
-                                  title={`Send performance report to ${hrName}`}
-                                >
-                                  ✉️️ Email Report to {hrName}
-                                </button>
-                              ) : (
-                                <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', marginTop: '6px' }}>Email not configured</span>
-                              )}
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })
+              )
             )}
           </div>
         ) : (
@@ -885,12 +1119,62 @@ export default function App() {
               </div>
             )}
 
+            {/* HR Monthly Summary Cards Dashboard */}
+            {userRole === 'HR' && (
+              <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>📊 Your Monthly Performance Summary</h3>
+                </div>
+
+                {(() => {
+                  let calcTotal = 0;
+                  let calcSelected = 0;
+                  let calcJoined = 0;
+                  let calcDropped = 0;
+                  let calcRejected = 0;
+
+                  Object.values(hrMonthlyBreakdown).forEach(val => {
+                    calcTotal += val.total;
+                    calcSelected += val.selected;
+                    calcJoined += val.joined;
+                    calcDropped += val.dropped;
+                    calcRejected += val.rejected;
+                  });
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Total Handled</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#0f172a' }}>{calcTotal}</p>
+                      </div>
+                      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#1d4ed8', fontWeight: '700', textTransform: 'uppercase' }}>Selected</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#1e40af' }}>{calcSelected}</p>
+                      </div>
+                      <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#047857', fontWeight: '700', textTransform: 'uppercase' }}>Joined</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#065f46' }}>{calcJoined}</p>
+                      </div>
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#b45309', fontWeight: '700', textTransform: 'uppercase' }}>Dropped</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#92400e' }}>{calcDropped}</p>
+                      </div>
+                      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#b91c1c', fontWeight: '700', textTransform: 'uppercase' }}>Rejected</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#991b1b' }}>{calcRejected}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             <div className="responsive-grid">
               
               {/* Form Card */}
               <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', height: 'fit-content' }}>
                 <h3 style={{ marginTop: 0, marginBottom: '14px', fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
-                  {userRole === 'HR' ? `📝 Daily Entry Form (${currentLoggedInHRName})` : (isEditing ? '✏️ Edit Candidate' : '➕ Add Candidate')}
+                  {userRole === 'HR' ? (isEditing ? '✏️ Edit Entry' : `📝 Daily Entry Form (${currentLoggedInHRName})`) : (isEditing ? '✏️ Edit Candidate' : '➕ Add Candidate')}
                 </h3>
                 <form onSubmit={handleFormSubmit}>
                   <div style={{ marginBottom: '10px' }}>
@@ -1010,7 +1294,7 @@ export default function App() {
 
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="submit" style={{ flex: 1, padding: '9px', background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
-                      {userRole === 'HR' ? 'Submit Entry 🚀' : (isEditing ? 'Update Candidate' : 'Save Candidate')}
+                      {userRole === 'HR' ? (isEditing ? 'Update Entry 🚀' : 'Submit Entry 🚀') : (isEditing ? 'Update Candidate' : 'Save Candidate')}
                     </button>
                     {isEditing && (
                       <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '9px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
@@ -1082,7 +1366,7 @@ export default function App() {
                           <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9', opacity: (item.status === 'Dropped' || item.status === 'Rejected') ? 0.6 : 1 }}>
                             <td style={{ padding: '10px' }}>
                               <div onClick={() => setSelectedCandidate(item)} style={{ fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}>{item.name}</div>
-                              <div style={{ fontSize: '10px', color: '#64748b' }}>📞 {item.phone || 'N/A'} • ✉️ {item.email || 'N/A'}</div>
+                              <div style={{ fontSize: '10px', color: '#64748b' }}>📞 {item.phone || 'N/A'} • ✉️️ {item.email || 'N/A'}</div>
                             </td>
                             <td style={{ padding: '10px' }}>
                               <div style={{ fontWeight: '700', color: '#1e293b' }}>🏢 {item.company_name || 'N/A'}</div>
@@ -1113,15 +1397,8 @@ export default function App() {
                                 {userRole === 'Partner' && (item.invoice_status === 'Ready to Invoice' || item.invoice_status === 'Invoice Raised / Pending Clearance') && (
                                   <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Paid</button>
                                 )}
-                                {userRole === 'Partner' && (
-                                  <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); setIsOtherSelected(false); }} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Edit</button>
-                                )}
-                                {userRole === 'Partner' && (
-                                  <button onClick={() => handleDeleteCandidate(item.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Del</button>
-                                )}
-                                {userRole === 'HR' && (
-                                  <button onClick={() => setSelectedCandidate(item)} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>View</button>
-                                )}
+                                <button onClick={() => handleEditClick(item)} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Edit</button>
+                                <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Del</button>
                               </div>
                             </td>
                           </tr>
@@ -1171,12 +1448,8 @@ export default function App() {
                               {userRole === 'Partner' && (item.invoice_status === 'Ready to Invoice' || item.invoice_status === 'Invoice Raised / Pending Clearance') && (
                                 <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Paid</button>
                               )}
-                              {userRole === 'Partner' && (
-                                <>
-                                  <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); setIsOtherSelected(false); }} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Edit</button>
-                                  <button onClick={() => handleDeleteCandidate(item.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Del</button>
-                                </>
-                              )}
+                              <button onClick={() => handleEditClick(item)} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Edit</button>
+                              <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Del</button>
                             </div>
                           </div>
                         </div>
