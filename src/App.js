@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import jsPDF from 'jspdf';
 
 const SUPABASE_URL = 'https://okreuewrtorwkyidoawx.supabase.co/';
 const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
@@ -35,6 +34,7 @@ export default function App() {
     revenue: '',
     status: 'Yet to Join',
     invoice_status: 'Pending',
+    invoice_number: '',
     payment_date: '',
     payment_mode: 'NEFT',
     notes: ''
@@ -50,10 +50,14 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [selectedCandidate, setSelectedCandidate] = useState(null);
-
   const [paymentModalCandidate, setPaymentModalCandidate] = useState(null);
   const [paymentDateInput, setPaymentDateInput] = useState('');
   const [paymentModeInput, setPaymentModeInput] = useState('NEFT');
+
+  // Multi-candidate invoice modal state
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedForBatchInvoice, setSelectedForBatchInvoice] = useState([]);
+  const [batchInvoiceNumber, setBatchInvoiceNumber] = useState('');
 
   useEffect(() => {
     fetchCandidates();
@@ -151,6 +155,7 @@ export default function App() {
         revenue: '', 
         status: 'Yet to Join', 
         invoice_status: 'Pending',
+        invoice_number: '',
         payment_date: '',
         payment_mode: 'NEFT',
         notes: ''
@@ -181,6 +186,36 @@ export default function App() {
       alert("Invoice successfully marked as Paid!");
       setPaymentModalCandidate(null);
       setPaymentDateInput('');
+      fetchCandidates();
+    }
+  };
+
+  const handleBatchInvoiceSubmit = async (e) => {
+    e.preventDefault();
+    if (!batchInvoiceNumber.trim()) {
+      alert("Kripya valid Invoice Number daalein.");
+      return;
+    }
+    if (selectedForBatchInvoice.length === 0) {
+      alert("Kripya kam se kam ek candidate select karein.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('candidates')
+      .update({ 
+        invoice_status: 'Invoice Raised / Pending Clearance',
+        invoice_number: batchInvoiceNumber.trim()
+      })
+      .in('id', selectedForBatchInvoice);
+
+    if (error) {
+      alert("Batch invoice update karne mein error aaya: " + error.message);
+    } else {
+      alert(`Invoice ${batchInvoiceNumber} successfully generate ho gaya selected candidates ke liye!`);
+      setShowInvoiceModal(false);
+      setBatchInvoiceNumber('');
+      setSelectedForBatchInvoice([]);
       fetchCandidates();
     }
   };
@@ -293,55 +328,13 @@ export default function App() {
     const subject = encodeURIComponent(`Monthly Recruitment Report - ${currentMonthName} [JobGiants CRM]`);
     const body = encodeURIComponent(emailBody);
 
-    // Direct Gmail Web Compose link so it opens Gmail instead of Outlook
     const gmailWebLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipientTo}&cc=${recipientCc}&su=${subject}&body=${body}`;
     window.open(gmailWebLink, '_blank');
   };
 
-  const generateInvoicePDF = (candidate) => {
-    if (candidate.status === 'Dropped' || candidate.status === 'Rejected') {
-      alert("Dropped ya Rejected candidate ka invoice generate nahi kiya ja sakta.");
-      return;
-    }
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('OMNE JOBGIANTS CONSULTANCY SERVICES', 14, 22);
-    doc.setFontSize(10);
-    doc.text('Recruitment & Talent Acquisition Solutions', 14, 28);
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 28);
-    doc.line(14, 32, 196, 32);
-
-    doc.setFontSize(14);
-    doc.text('PLACEMENT INVOICE', 14, 45);
-    doc.setFontSize(11);
-    doc.text(`Candidate Name: ${candidate.name}`, 14, 58);
-    doc.text(`Email: ${candidate.email || 'N/A'} | Phone: ${candidate.phone || 'N/A'}`, 14, 66);
-    doc.text(`Client Company: ${candidate.company_name || 'N/A'} (POC: ${candidate.client_poc || 'N/A'})`, 14, 74);
-    doc.text(`Process Name: ${candidate.process_name || 'N/A'}`, 14, 82);
-    doc.text(`Internal HR Assigned: ${candidate.recruiter}`, 14, 90);
-    doc.text(`Selection Date: ${candidate.selection_date || 'N/A'}`, 14, 98);
-    doc.text(`Joining Date: ${candidate.joining_date}`, 14, 106);
-
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, 114, 182, 10, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.text('Description', 18, 120);
-    doc.text('Amount (INR)', 150, 120);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Recruitment Fee for ${candidate.name}`, 18, 132);
-    doc.text(`Rs. ${parseFloat(candidate.revenue || 0).toLocaleString('en-IN')}`, 150, 132);
-
-    doc.line(14, 142, 196, 142);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total Amount Due:', 100, 150);
-    doc.text(`Rs. ${parseFloat(candidate.revenue || 0).toLocaleString('en-IN')}`, 150, 150);
-
-    doc.save(`Invoice_${candidate.name.replace(/\s+/g, '_')}.pdf`);
-  };
-
   const allRecruiters = Array.from(new Set([...predefinedHRs, ...candidates.map(item => item.recruiter)])).filter(Boolean);
   const readyToInvoiceList = candidates.filter(item => item.invoice_status === 'Ready to Invoice');
+  const pendingInvoicesList = candidates.filter(item => item.invoice_status === 'Invoice Raised / Pending Clearance');
 
   const totalRevenue = candidates
     .filter(item => (filterHR === 'All' || item.recruiter === filterHR))
@@ -457,7 +450,6 @@ export default function App() {
         tr.hover-effect:hover {
           background-color: #f8fafc !important;
         }
-
         .responsive-grid {
           display: grid;
           grid-template-columns: 1fr 2.9fr;
@@ -469,7 +461,6 @@ export default function App() {
           gap: 20px;
           margin-bottom: 24px;
         }
-
         @media (max-width: 1024px) {
           .responsive-grid {
             grid-template-columns: 1fr !important;
@@ -499,7 +490,7 @@ export default function App() {
 
       <div className="animated-container" style={{ position: 'relative', zIndex: 1, maxWidth: '1400px', margin: '0 auto' }}>
         
-        {/* Modern Header Navbar */}
+        {/* Modern Header Navbar with Notification Bell */}
         <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderRadius: '16px', marginBottom: '24px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{ padding: '4px', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', borderRadius: '50%', display: 'flex' }}>
@@ -516,10 +507,34 @@ export default function App() {
           </div>
           
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            
+            {/* Notification Bell for Pending Invoices */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                onClick={() => setFilterInvoiceStatus('Invoice Raised / Pending Clearance')}
+                style={{ 
+                  background: pendingInvoicesList.length > 0 ? '#ef4444' : '#e2e8f0', 
+                  color: pendingInvoicesList.length > 0 ? '#fff' : '#334155', 
+                  border: 'none', 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  fontSize: '12px', 
+                  fontWeight: '700', 
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: pendingInvoicesList.length > 0 ? '0 2px 8px rgba(239, 68, 68, 0.4)' : 'none'
+                }}
+                title="Pending Invoices Clearance Alert"
+              >
+                🔔 Pending Invoices ({pendingInvoicesList.length})
+              </button>
+            </div>
+
             <button 
               onClick={sendMonthlyReportEmail} 
               style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)' }}
-              title="Send monthly report via Gmail to Jobgiants1@gmail.com"
             >
               📧 Send Monthly Report (Gmail)
             </button>
@@ -555,20 +570,27 @@ export default function App() {
           </div>
         </div>
 
-        {/* Ready to Invoice Notification Alert */}
+        {/* Ready to Invoice Notification Alert & Batch Invoice Generator Trigger */}
         {readyToInvoiceList.length > 0 && (
           <div className="invoice-alert" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #f59e0b', padding: '14px 20px', borderRadius: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '20px' }}>⚡</span>
               <span style={{ fontSize: '13px', fontWeight: '700', color: '#92400e' }}>
-                Action Required: {readyToInvoiceList.length} candidate(s) have crossed 90 days (91st day reached). Invoices are ready for collection!
+                {readyToInvoiceList.length} candidate(s) have completed 90 days! Group and assign an Invoice Number.
               </span>
             </div>
-            <button 
-              onClick={() => setFilterInvoiceStatus('Ready to Invoice')} 
-              style={{ background: '#d97706', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 4px rgba(217, 119, 6, 0.3)' }}>
-              Filter Ready Invoices
-            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                onClick={() => setShowInvoiceModal(true)} 
+                style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 4px rgba(79, 70, 229, 0.3)' }}>
+                ➕ Create Group Invoice Number
+              </button>
+              <button 
+                onClick={() => setFilterInvoiceStatus('Ready to Invoice')} 
+                style={{ background: '#d97706', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                Filter Ready Invoices
+              </button>
+            </div>
           </div>
         )}
 
@@ -589,31 +611,6 @@ export default function App() {
                         <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: '8px' }}>Joined: {mData.joinedCount}</span>
                         <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '8px' }}>Dropped: {mData.droppedCount}</span>
                       </div>
-                    </div>
-
-                    <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#475569', fontWeight: '600' }}>Internal HR Performance Breakdown:</h4>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '400px' }}>
-                        <thead>
-                          <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569' }}>
-                            <th style={{ padding: '10px 12px', borderTopLeftRadius: '6px', borderBottomLeftRadius: '6px' }}>HR Name</th>
-                            <th style={{ padding: '10px 12px' }}>Joined Candidates</th>
-                            <th style={{ padding: '10px 12px', borderTopRightRadius: '6px', borderBottomRightRadius: '6px' }}>Dropped / Rejected</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.keys(mData.recruiters).map((rec) => {
-                            const recStats = mData.recruiters[rec];
-                            return (
-                              <tr key={rec} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                <td style={{ padding: '10px 12px', fontWeight: '700', color: '#1e293b' }}>👤 {rec}</td>
-                                <td style={{ padding: '10px 12px', color: '#059669', fontWeight: '700' }}>{recStats.joined} Joined</td>
-                                <td style={{ padding: '10px 12px', color: '#dc2626', fontWeight: '700' }}>{recStats.dropped} Dropped</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
                     </div>
                   </div>
                 );
@@ -766,7 +763,7 @@ export default function App() {
                       {isEditing ? 'Update Candidate' : 'Save Candidate'}
                     </button>
                     {isEditing && (
-                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '10px 14px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '10px 14px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
                         Cancel
                       </button>
                     )}
@@ -789,13 +786,12 @@ export default function App() {
                       ))}
                     </select>
 
-                    <select className="modern-input" value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '100px', fontSize: '12px', backgroundColor: '#fff' }}>
-                      <option value="All">All Stages</option>
-                      <option value="Yet to Join">Yet to Join</option>
-                      <option value="Selected">Selected</option>
-                      <option value="Joined">Joined</option>
-                      <option value="Dropped">Dropped</option>
-                      <option value="Rejected">Rejected</option>
+                    <select className="modern-input" value={filterInvoiceStatus} onChange={(e) => setFilterInvoiceStatus(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '130px', fontSize: '12px', backgroundColor: '#fff' }}>
+                      <option value="All">All Invoices</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Ready to Invoice">Ready to Invoice</option>
+                      <option value="Invoice Raised / Pending Clearance">Pending Clearance</option>
+                      <option value="Paid">Paid</option>
                     </select>
                   </div>
                 </div>
@@ -806,24 +802,23 @@ export default function App() {
                       <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569', fontWeight: '700' }}>
                         <th style={{ padding: '10px 12px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Candidate Name</th>
                         <th style={{ padding: '10px 12px' }}>Client & Process</th>
-                        <th style={{ padding: '10px 12px' }}>Dates (Sel / Join)</th>
+                        <th style={{ padding: '10px 12px' }}>Joining Date</th>
                         <th style={{ padding: '10px 12px' }}>Revenue</th>
                         <th style={{ padding: '10px 12px' }}>Stage</th>
-                        <th style={{ padding: '10px 12px' }}>Invoice</th>
+                        <th style={{ padding: '10px 12px' }}>Invoice Status & No.</th>
                         <th style={{ padding: '10px 12px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredCandidates.map((item) => {
                         const rev = parseFloat(item.revenue || 0);
-                        const isLateral = rev >= 30000 && item.status !== 'Dropped' && item.status !== 'Rejected';
                         
                         return (
                           <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9', opacity: (item.status === 'Dropped' || item.status === 'Rejected') ? 0.6 : 1 }}>
                             <td style={{ padding: '12px' }}>
                               <div 
                                 onClick={() => setSelectedCandidate(item)} 
-                                style={{ fontWeight: '700', color: '#4f46e5', cursor: 'pointer', textDecoration: 'none' }}
+                                style={{ fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}
                                 title="Click to view details"
                               >
                                 {item.name}
@@ -832,20 +827,13 @@ export default function App() {
                             </td>
                             <td style={{ padding: '12px' }}>
                               <div style={{ fontWeight: '700', color: '#1e293b' }}>🏢 {item.company_name || 'N/A'}</div>
-                              <div style={{ fontSize: '11px', color: '#475569' }}>Proc: {item.process_name || 'N/A'}</div>
-                              <div style={{ fontSize: '10px', color: '#0284c7', fontWeight: '600' }}>POC: {item.client_poc || 'N/A'} • HR: {item.recruiter}</div>
+                              <div style={{ fontSize: '11px', color: '#475569' }}>Proc: {item.process_name || 'N/A'} • HR: {item.recruiter}</div>
                             </td>
                             <td style={{ padding: '12px', fontSize: '11px', color: '#475569' }}>
-                              <div>Sel: {item.selection_date || 'N/A'}</div>
-                              <div>Join: {item.joining_date}</div>
+                              <div>{item.joining_date}</div>
                             </td>
                             <td style={{ padding: '12px' }}>
                               <div style={{ fontWeight: '700', color: '#0f172a' }}>Rs. {rev.toLocaleString('en-IN')}</div>
-                              {isLateral && (
-                                <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', display: 'inline-block', marginTop: '2px' }}>
-                                  Lateral
-                                </span>
-                              )}
                             </td>
                             <td style={{ padding: '12px' }}>
                               <span style={{ 
@@ -854,16 +842,8 @@ export default function App() {
                                 fontSize: '11px', 
                                 fontWeight: '700', 
                                 display: 'inline-block',
-                                background: 
-                                  item.status === 'Joined' ? '#d1fae5' : 
-                                  item.status === 'Selected' ? '#e0e7ff' : 
-                                  item.status === 'Dropped' ? '#fee2e2' : 
-                                  item.status === 'Rejected' ? '#f1f5f9' : '#fef3c7',
-                                color:
-                                  item.status === 'Joined' ? '#065f46' : 
-                                  item.status === 'Selected' ? '#3730a3' : 
-                                  item.status === 'Dropped' ? '#991b1b' : 
-                                  item.status === 'Rejected' ? '#475569' : '#b45309'
+                                background: item.status === 'Joined' ? '#d1fae5' : '#fef3c7',
+                                color: item.status === 'Joined' ? '#065f46' : '#b45309'
                               }}>
                                 {item.status || 'Yet to Join'}
                               </span>
@@ -879,27 +859,29 @@ export default function App() {
                                   background: 
                                     item.invoice_status === 'Paid' ? '#d1fae5' : 
                                     item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : 
-                                    item.invoice_status === 'Cancelled' ? '#fee2e2' : '#f1f5f9',
+                                    item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#fee2e2' : '#f1f5f9',
                                   color: 
                                     item.invoice_status === 'Paid' ? '#065f46' : 
-                                    item.invoice_status === 'Cancelled' ? '#991b1b' : '#334155'
+                                    item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#991b1b' : '#334155'
                                 }}>
                                   {item.invoice_status}
                                 </span>
                               </div>
+                              {item.invoice_number && (
+                                <div style={{ fontSize: '10px', color: '#4f46e5', marginTop: '4px', fontWeight: '700' }}>
+                                  Inv#: {item.invoice_number}
+                                </div>
+                              )}
                               {item.invoice_status === 'Paid' && (
-                                <div style={{ fontSize: '10px', color: '#059669', marginTop: '4px', fontWeight: '600' }}>
+                                <div style={{ fontSize: '10px', color: '#059669', marginTop: '2px', fontWeight: '600' }}>
                                   {item.payment_mode} ({item.payment_date})
                                 </div>
                               )}
                             </td>
                             <td style={{ padding: '12px' }}>
                               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                {item.invoice_status === 'Ready to Invoice' && (
-                                  <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Paid</button>
-                                )}
-                                {item.invoice_status !== 'Cancelled' && (
-                                  <button onClick={() => generateInvoicePDF(item)} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>PDF</button>
+                                {(item.invoice_status === 'Ready to Invoice' || item.invoice_status === 'Invoice Raised / Pending Clearance') && (
+                                  <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Mark Paid</button>
                                 )}
                                 <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); setIsOtherSelected(false); }} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Edit</button>
                                 <button onClick={() => handleDeleteCandidate(item.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Del</button>
@@ -915,6 +897,52 @@ export default function App() {
 
             </div>
           </>
+        )}
+
+        {/* Batch / Group Invoice Number Assignment Modal */}
+        {showInvoiceModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '16px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '500px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', fontSize: '18px', fontWeight: '800' }}>Create Group Invoice Number</h3>
+              <form onSubmit={handleBatchInvoiceSubmit}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Invoice Number (e.g. JG/2026/045) *</label>
+                  <input type="text" className="modern-input" placeholder="Enter custom invoice number..." value={batchInvoiceNumber} onChange={(e) => setBatchInvoiceNumber(e.target.value)} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                </div>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '6px' }}>Select Candidates for this Invoice (Ready to Invoice):</label>
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px', marginBottom: '16px', background: '#f8fafc' }}>
+                  {readyToInvoiceList.length === 0 ? (
+                    <p style={{ fontSize: '12px', color: '#64748b' }}>No candidates ready to invoice right now.</p>
+                  ) : (
+                    readyToInvoiceList.map(cand => (
+                      <label key={cand.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '12px', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedForBatchInvoice.includes(cand.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedForBatchInvoice([...selectedForBatchInvoice, cand.id]);
+                            } else {
+                              setSelectedForBatchInvoice(selectedForBatchInvoice.filter(id => id !== cand.id));
+                            }
+                          }}
+                        />
+                        <strong style={{ color: '#1e293b' }}>{cand.name}</strong> ({cand.company_name}) - Rs. {parseFloat(cand.revenue || 0).toLocaleString('en-IN')}
+                      </label>
+                    ))
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" style={{ flex: 1, padding: '11px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+                    Assign Invoice Number & Move to Pending Clearance
+                  </button>
+                  <button type="button" onClick={() => setShowInvoiceModal(false)} style={{ padding: '11px 16px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
 
         {/* Mark as Paid Modal */}
@@ -939,8 +967,8 @@ export default function App() {
                   </select>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button type="submit" style={{ flex: 1, padding: '11px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}>
-                    Mark as Paid
+                  <button type="submit" style={{ flex: 1, padding: '11px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+                    Mark as Paid (Clear Invoice)
                   </button>
                   <button type="button" onClick={() => setPaymentModalCandidate(null)} style={{ padding: '11px 16px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
                     Cancel
@@ -964,11 +992,11 @@ export default function App() {
                 <p><strong>Process:</strong> {selectedCandidate.process_name || 'N/A'}</p>
                 <p><strong>Client POC:</strong> {selectedCandidate.client_poc || 'N/A'}</p>
                 <p><strong>Internal HR:</strong> {selectedCandidate.recruiter || 'N/A'}</p>
-                <p><strong>Selection Date:</strong> {selectedCandidate.selection_date || 'N/A'}</p>
                 <p><strong>Joining Date:</strong> {selectedCandidate.joining_date || 'N/A'}</p>
                 <p><strong>Revenue:</strong> Rs. {parseFloat(selectedCandidate.revenue || 0).toLocaleString('en-IN')}</p>
                 <p><strong>Status:</strong> {selectedCandidate.status}</p>
                 <p><strong>Invoice Status:</strong> {selectedCandidate.invoice_status}</p>
+                {selectedCandidate.invoice_number && <p><strong>Invoice Number:</strong> {selectedCandidate.invoice_number}</p>}
                 {selectedCandidate.notes && <p><strong>Notes/Remarks:</strong> {selectedCandidate.notes}</p>}
               </div>
               <button onClick={() => setSelectedCandidate(null)} style={{ marginTop: '20px', width: '100%', padding: '11px', background: '#475569', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
