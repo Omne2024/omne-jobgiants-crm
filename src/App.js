@@ -19,11 +19,14 @@ export default function App() {
     return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
   });
   
+  // Pre-defined HRs list + any future HRs added
+  const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey'];
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    recruiter: '',
+    recruiter: 'Sanchi', // Default select
     company_name: '',
     process_name: '',
     joining_date: '',
@@ -35,6 +38,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterInvoiceStatus, setFilterInvoiceStatus] = useState('All');
   const [filterStage, setFilterStage] = useState('All');
+  const [filterHR, setFilterHR] = useState('All');
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -100,6 +104,7 @@ export default function App() {
 
     const payload = {
       ...formData,
+      recruiter: formData.recruiter.trim(),
       invoice_status: updatedInvoiceStatus
     };
 
@@ -118,7 +123,7 @@ export default function App() {
         name: '', 
         email: '',
         phone: '',
-        recruiter: '', 
+        recruiter: 'Sanchi', 
         company_name: '', 
         process_name: '', 
         joining_date: '', 
@@ -146,8 +151,8 @@ export default function App() {
   const downloadSampleCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,recruiter,joining_date,revenue,status\n"
-      + "Rahul Sharma,rahul@email.com,9876543210,Tech Mahindra,US Voice,Amit,2026-10-15,35000,Joined\n"
-      + "Priya Singh,priya@email.com,9123456789,Amazon,Backend,Neha,2026-10-20,25000,Yet to Join";
+      + "Rahul Sharma,rahul@email.com,9876543210,Tech Mahindra,US Voice,Sanchi,2026-10-15,35000,Joined\n"
+      + "Priya Singh,priya@email.com,9123456789,Amazon,Backend,Sadaf,2026-10-20,25000,Yet to Join";
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -186,7 +191,7 @@ export default function App() {
           phone: obj.phone || '',
           company_name: obj.company_name || '',
           process_name: obj.process_name || '',
-          recruiter: obj.recruiter || 'Unassigned',
+          recruiter: obj.recruiter ? obj.recruiter.trim() : 'Sanchi',
           joining_date: obj.joining_date || new Date().toISOString().split('T')[0],
           revenue: obj.revenue || 0,
           status: obj.status || 'Yet to Join',
@@ -250,11 +255,16 @@ export default function App() {
     doc.save(`Invoice_${candidate.name.replace(/\s+/g, '_')}.pdf`);
   };
 
+  // Combine pre-defined HRs and any unique HRs found in database or added later
+  const allRecruiters = Array.from(new Set([...predefinedHRs, ...candidates.map(item => item.recruiter)])).filter(Boolean);
+
   const totalRevenue = candidates
+    .filter(item => (filterHR === 'All' || item.recruiter === filterHR))
     .filter(item => item.status !== 'Dropped' && item.status !== 'Rejected')
     .reduce((acc, curr) => acc + (parseFloat(curr.revenue) || 0), 0);
   
   const lateralHiringCount = candidates
+    .filter(item => (filterHR === 'All' || item.recruiter === filterHR))
     .filter(item => item.status !== 'Dropped' && item.status !== 'Rejected' && parseFloat(item.revenue || 0) >= 30000).length;
 
   const filteredCandidates = candidates.filter((item) => {
@@ -268,8 +278,9 @@ export default function App() {
     
     const matchesStatus = filterInvoiceStatus === 'All' || item.invoice_status === filterInvoiceStatus;
     const matchesStage = filterStage === 'All' || item.status === filterStage;
+    const matchesHR = filterHR === 'All' || item.recruiter === filterHR;
 
-    return matchesSearch && matchesStatus && matchesStage;
+    return matchesSearch && matchesStatus && matchesStage && matchesHR;
   });
 
   const monthlyData = {};
@@ -310,7 +321,6 @@ export default function App() {
   return (
     <div style={{ position: 'relative', padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#f9fafb', minHeight: '100vh', overflow: 'hidden' }}>
       
-      {/* CSS Animations style tag */}
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -453,11 +463,15 @@ export default function App() {
             {userRole === 'Partner' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div style={{ backgroundColor: '#16a34a', color: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                  <h3 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', opacity: 0.9 }}>Active Revenue Pipeline (Excl. Dropped)</h3>
+                  <h3 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', opacity: 0.9 }}>
+                    {filterHR === 'All' ? 'Active Revenue Pipeline' : `Revenue (${filterHR})`}
+                  </h3>
                   <p style={{ margin: '5px 0 0 0', fontSize: '28px', fontWeight: 'bold' }}>Rs. {totalRevenue.toLocaleString('en-IN')}</p>
                 </div>
                 <div style={{ backgroundColor: '#2563eb', color: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                  <h3 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', opacity: 0.9 }}>Active Lateral Hirings (≥ Rs. 30k)</h3>
+                  <h3 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', opacity: 0.9 }}>
+                    {filterHR === 'All' ? 'Active Lateral Hirings (≥ Rs. 30k)' : `Lateral Hirings (${filterHR})`}
+                  </h3>
                   <p style={{ margin: '5px 0 0 0', fontSize: '28px', fontWeight: 'bold' }}>{lateralHiringCount} Candidates</p>
                 </div>
               </div>
@@ -489,7 +503,11 @@ export default function App() {
                   </div>
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Internal HR Name *</label>
-                    <input type="text" value={formData.recruiter} onChange={(e) => setFormData({ ...formData, recruiter: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
+                    <select value={formData.recruiter} onChange={(e) => setFormData({ ...formData, recruiter: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box', backgroundColor: '#fff' }}>
+                      {allRecruiters.map(hr => (
+                        <option key={hr} value={hr}>{hr}</option>
+                      ))}
+                    </select>
                   </div>
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Joining Date *</label>
@@ -514,7 +532,7 @@ export default function App() {
                       {isEditing ? 'Update Details' : 'Save Candidate'}
                     </button>
                     {isEditing && (
-                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending' }); }} style={{ padding: '10px', backgroundColor: '#6b7280', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setFormData({ name: '', email: '', phone: '', recruiter: 'Sanchi', company_name: '', process_name: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending' }); }} style={{ padding: '10px', backgroundColor: '#6b7280', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                         Cancel
                       </button>
                     )}
@@ -527,6 +545,15 @@ export default function App() {
                   <h3 style={{ margin: 0 }}>Candidates ({filteredCandidates.length})</h3>
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <input type="text" placeholder="Search name, email, phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }} />
+                    
+                    {/* HR Filter Dropdown */}
+                    <select value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: filterHR !== 'All' ? '#eff6ff' : '#fff', fontWeight: filterHR !== 'All' ? 'bold' : 'normal' }}>
+                      <option value="All">All HRs (Overview)</option>
+                      {allRecruiters.map(hr => (
+                        <option key={hr} value={hr}>👤 {hr}</option>
+                      ))}
+                    </select>
+
                     <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }}>
                       <option value="All">All Stages</option>
                       <option value="Yet to Join">Yet to Join</option>
@@ -577,7 +604,7 @@ export default function App() {
                             </td>
                             <td style={{ padding: '10px' }}>
                               <div>{item.process_name || 'N/A'}</div>
-                              <div style={{ fontSize: '11px', color: '#6b7280' }}>👤 HR: {item.recruiter}</div>
+                              <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'bold' }}>👤 HR: {item.recruiter}</div>
                             </td>
                             <td style={{ padding: '10px' }}>{item.joining_date}</td>
                             <td style={{ padding: '10px' }}>
@@ -635,7 +662,7 @@ export default function App() {
 
         {selectedCandidate && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-            <div className="animated-modal" style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', width: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <div className="animated-modal" style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', width: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'}}>
               <h3 style={{ marginTop: 0, color: '#1f2937', borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}>Candidate Details</h3>
               <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#374151' }}>
                 <p><strong>Name:</strong> {selectedCandidate.name}</p>
