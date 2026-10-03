@@ -75,7 +75,7 @@ export default function App() {
 
   const fetchCandidates = async () => {
     let query = supabase.from('candidates').select('*');
-    const { data, error } = await query.order('selection_date', { ascending: false });
+    const { data, error } = await query.order('joining_date', { ascending: false });
 
     if (error) {
       console.error("Fetch Error:", error);
@@ -94,7 +94,6 @@ export default function App() {
         if (item.status === 'Dropped' || item.status === 'Rejected') {
           currentInvoiceStatus = 'Cancelled';
         } else if (diffDays > 90 && currentInvoiceStatus === 'Pending') {
-          // 90 din pure hone ke agle din yaani 91st day par 'Ready to Invoice' hoga
           currentInvoiceStatus = 'Ready to Invoice';
         }
 
@@ -123,6 +122,7 @@ export default function App() {
 
     const payload = {
       ...formData,
+      selection_date: formData.selection_date || null,
       recruiter: finalRecruiter,
       invoice_status: updatedInvoiceStatus
     };
@@ -199,7 +199,7 @@ export default function App() {
   const downloadSampleCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
-      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
+      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,,2026-10-15,35000,Joined,Joining confirmed\n"
       + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
@@ -244,7 +244,7 @@ export default function App() {
           process_name: obj.process_name || 'General',
           client_poc: obj.client_poc || '',
           recruiter: obj.recruiter ? obj.recruiter.trim() : 'Sanchi',
-          selection_date: obj.selection_date || new Date().toISOString().split('T')[0],
+          selection_date: obj.selection_date || null,
           joining_date: obj.joining_date || new Date().toISOString().split('T')[0],
           revenue: obj.revenue || 0,
           status: statusVal,
@@ -266,6 +266,36 @@ export default function App() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const sendMonthlyReportEmail = () => {
+    const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    // Calculate summary metrics
+    const totalRev = candidates.filter(item => item.status !== 'Dropped' && item.status !== 'Rejected').reduce((acc, curr) => acc + (parseFloat(curr.revenue) || 0), 0);
+    const totalJoined = candidates.filter(item => item.status === 'Joined').length;
+    const totalDropped = candidates.filter(item => item.status === 'Dropped' || item.status === 'Rejected').length;
+
+    let emailBody = `OMNE JOBGIANTS CONSULTANCY - MONTHLY REPORT\n`;
+    emailBody = emailBody + `Month: ${currentMonthName}\n`;
+    emailBody = emailBody + `========================================\n`;
+    emailBody = emailBody + `Total Active Revenue: Rs. ${totalRev.toLocaleString('en-IN')}\n`;
+    emailBody = emailBody + `Total Joined Candidates: ${totalJoined}\n`;
+    emailBody = emailBody + `Total Dropped/Rejected: ${totalDropped}\n`;
+    emailBody = emailBody + `========================================\n\n`;
+    emailBody = emailBody + `CANDIDATES LIST SUMMARY:\n`;
+
+    candidates.forEach((c, idx) => {
+      emailBody = emailBody + `${idx + 1}. ${c.name} | Company: ${c.company_name || 'N/A'} | HR: ${c.recruiter} | Rev: Rs. ${parseFloat(c.revenue || 0).toLocaleString('en-IN')} | Status: ${c.status} | Invoice: ${c.invoice_status}\n`;
+    });
+
+    const recipientTo = 'suraj.jha@jobgiants.in';
+    const recipientCc = 'garimabansal@jobgiants.in';
+    const subject = encodeURIComponent(`Monthly Recruitment Report - ${currentMonthName} [JobGiants CRM]`);
+    const body = encodeURIComponent(emailBody);
+
+    const mailtoLink = `mailto:${recipientTo}?cc=${recipientCc}&subject=${subject}&body=${body}`;
+    window.location.href = mailtoLink;
   };
 
   const generateInvoicePDF = (candidate) => {
@@ -341,7 +371,7 @@ export default function App() {
 
   const monthlyData = {};
   candidates.forEach(item => {
-    const dateToUse = item.selection_date || item.joining_date;
+    const dateToUse = item.joining_date || item.selection_date;
     if (!dateToUse) return;
     const dateObj = new Date(dateToUse);
     const monthKey = isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -486,6 +516,14 @@ export default function App() {
           </div>
           
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              onClick={sendMonthlyReportEmail} 
+              style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)' }}
+              title="Send monthly report to Suraj & Garima"
+            >
+              📧 Send Monthly Report
+            </button>
+
             <label style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
               🖼 Logo
               <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
@@ -686,8 +724,8 @@ export default function App() {
                   </div>
 
                   <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Selection Date *</label>
-                    <input type="date" className="modern-input" value={formData.selection_date} onChange={(e) => setFormData({ ...formData, selection_date: e.target.value })} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Selection Date (Optional)</label>
+                    <input type="date" className="modern-input" value={formData.selection_date} onChange={(e) => setFormData({ ...formData, selection_date: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
                   </div>
 
                   <div style={{ marginBottom: '12px' }}>
