@@ -342,7 +342,7 @@ export default function App() {
     window.open(gmailWebLink, '_blank');
   };
 
-  // Dedicated 1-Click HR Performance Report Email Sender
+  // Dedicated 1-Click HR Performance Report Email Sender (Revenue REMOVED for HRs)
   const sendHRPerformanceEmail = (hrName, monthKey, hrData) => {
     const hrEmail = hrEmailDirectory[hrName] || '';
     if (!hrEmail) {
@@ -365,12 +365,11 @@ export default function App() {
     emailBody += `• Total Selections / Candidates Handled: ${hrCandidates.length}\n`;
     emailBody += `• Total Successful Joinings: ${hrData.joined}\n`;
     emailBody += `• Total Drops / Rejections: ${hrData.dropped}\n`;
-    emailBody += `• Total Revenue Generated: Rs. ${hrData.revenue.toLocaleString('en-IN')}\n`;
     emailBody += `----------------------------------------\n\n`;
     emailBody += `DETAILED CANDIDATE LIST:\n`;
 
     hrCandidates.forEach((c, idx) => {
-      emailBody += `${idx + 1}. Candidate: ${c.name} | Company: ${c.company_name || 'N/A'} | Process: ${c.process_name || 'N/A'} | Status: ${c.status} | Revenue: Rs. ${parseFloat(c.revenue || 0).toLocaleString('en-IN')}\n`;
+      emailBody += `${idx + 1}. Candidate: ${c.name} | Company: ${c.company_name || 'N/A'} | Process: ${c.process_name || 'N/A'} | Status: ${c.status}\n`;
     });
 
     emailBody += `\nKeep up the great work!\n\nBest Regards,\nOmne JobGiants Management`;
