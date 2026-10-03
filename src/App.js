@@ -21,6 +21,14 @@ export default function App() {
   const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey'];
   const predefinedCompanies = ['Transom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
 
+  // HR Email Mapping Database
+  const hrEmailDirectory = {
+    'Sanchi': 'sanchi.aggarwal@jobgiants.in',
+    'Sadaf': 'sadaf.kazi@jobgiants.in',
+    'Anjali': 'anjali.srivastava@jobgiants.in',
+    'Shrey': 'shrey@jobgiants.in'
+  };
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -48,6 +56,9 @@ export default function App() {
   const [filterStage, setFilterStage] = useState('All');
   const [filterHR, setFilterHR] = useState('All');
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Reports Filter state
+  const [selectedReportMonth, setSelectedReportMonth] = useState('All');
   
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [paymentModalCandidate, setPaymentModalCandidate] = useState(null);
@@ -331,6 +342,48 @@ export default function App() {
     window.open(gmailWebLink, '_blank');
   };
 
+  // Dedicated 1-Click HR Performance Report Email Sender
+  const sendHRPerformanceEmail = (hrName, monthKey, hrData) => {
+    const hrEmail = hrEmailDirectory[hrName] || '';
+    if (!hrEmail) {
+      alert(`Kripya ${hrName} ka valid email address configure karein.`);
+      return;
+    }
+
+    const hrCandidates = candidates.filter(item => {
+      const dateToUse = item.joining_date || item.selection_date;
+      if (!dateToUse) return false;
+      const dateObj = new Date(dateToUse);
+      const mKey = isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+      return item.recruiter?.trim() === hrName && mKey === monthKey;
+    });
+
+    let emailBody = `Hi ${hrName},\n\n`;
+    emailBody += `Here is your monthly performance report for ${monthKey} at Omne JobGiants Consultancy:\n\n`;
+    emailBody += `----------------------------------------\n`;
+    emailBody += `SUMMARY:\n`;
+    emailBody += `• Total Selections / Candidates Handled: ${hrCandidates.length}\n`;
+    emailBody += `• Total Successful Joinings: ${hrData.joined}\n`;
+    emailBody += `• Total Drops / Rejections: ${hrData.dropped}\n`;
+    emailBody += `• Total Revenue Generated: Rs. ${hrData.revenue.toLocaleString('en-IN')}\n`;
+    emailBody += `----------------------------------------\n\n`;
+    emailBody += `DETAILED CANDIDATE LIST:\n`;
+
+    hrCandidates.forEach((c, idx) => {
+      emailBody += `${idx + 1}. Candidate: ${c.name} | Company: ${c.company_name || 'N/A'} | Process: ${c.process_name || 'N/A'} | Status: ${c.status} | Revenue: Rs. ${parseFloat(c.revenue || 0).toLocaleString('en-IN')}\n`;
+    });
+
+    emailBody += `\nKeep up the great work!\n\nBest Regards,\nOmne JobGiants Management`;
+
+    const recipientTo = hrEmail;
+    const recipientCc = 'suraj.jha@jobgiants.in,garimabansal@jobgiants.in';
+    const subject = encodeURIComponent(`Your Monthly Performance Report - ${monthKey} [JobGiants]`);
+    const body = encodeURIComponent(emailBody);
+
+    const gmailWebLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipientTo}&cc=${recipientCc}&su=${subject}&body=${body}`;
+    window.open(gmailWebLink, '_blank');
+  };
+
   const allRecruiters = Array.from(new Set([...predefinedHRs, ...candidates.map(item => item.recruiter)])).filter(Boolean);
   const readyToInvoiceList = candidates.filter(item => item.invoice_status === 'Ready to Invoice');
   const pendingInvoicesList = candidates.filter(item => item.invoice_status === 'Invoice Raised / Pending Clearance');
@@ -361,6 +414,7 @@ export default function App() {
     return matchesSearch && matchesStatus && matchesStage && matchesHR;
   });
 
+  // Calculate Monthly Data & HR Performance
   const monthlyData = {};
   candidates.forEach(item => {
     const dateToUse = item.joining_date || item.selection_date;
@@ -381,14 +435,15 @@ export default function App() {
     const recName = item.recruiter ? item.recruiter.trim() : 'Unassigned';
 
     if (!monthlyData[monthKey].recruiters[recName]) {
-      monthlyData[monthKey].recruiters[recName] = { joined: 0, dropped: 0 };
+      monthlyData[monthKey].recruiters[recName] = { joined: 0, dropped: 0, revenue: 0 };
     }
 
     if (item.status !== 'Dropped' && item.status !== 'Rejected') {
       monthlyData[monthKey].totalRevenue += rev;
+      monthlyData[monthKey].recruiters[recName].revenue += rev;
     }
 
-    if (item.status === 'Joined') {
+    if (item.status === 'Joined' || item.status === 'Selected') {
       monthlyData[monthKey].joinedCount += 1;
       monthlyData[monthKey].recruiters[recName].joined += 1;
     } else if (item.status === 'Dropped' || item.status === 'Rejected') {
@@ -450,7 +505,6 @@ export default function App() {
           background-color: #f8fafc !important;
         }
 
-        /* Responsive Layout Switchers */
         .responsive-grid {
           display: grid;
           grid-template-columns: 1fr 2.8fr;
@@ -550,7 +604,6 @@ export default function App() {
               📧 Report
             </button>
 
-            {/* CSV Template Download Button */}
             <button 
               onClick={downloadSampleCSV} 
               style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
@@ -559,7 +612,6 @@ export default function App() {
               📥 CSV Template
             </button>
 
-            {/* Bulk Upload File Input */}
             <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }} title="Upload Bulk Candidates via CSV">
               📂 Bulk Upload
               <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
@@ -609,26 +661,90 @@ export default function App() {
           </div>
         )}
 
+        {/* REPORTS & HR PERFORMANCE TAB */}
         {activeTab === 'reports' ? (
           <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-            <h2 style={{ marginTop: 0, marginBottom: '16px', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>Month-wise Revenue & HR Performance</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <h2 style={{ margin: 0, color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>Month-wise Revenue & HR Performance</h2>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>Filter Month:</label>
+                <select 
+                  className="modern-input" 
+                  value={selectedReportMonth} 
+                  onChange={(e) => setSelectedReportMonth(e.target.value)} 
+                  style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff', fontWeight: '700' }}
+                >
+                  <option value="All">All Months</option>
+                  {Object.keys(monthlyData).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {Object.keys(monthlyData).length === 0 ? (
-              <p style={{ color: '#64748b', fontSize: '13px' }}>No data records found.</p>
+              <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
             ) : (
-              Object.keys(monthlyData).map((month) => {
-                const mData = monthlyData[month];
-                return (
-                  <div key={month} style={{ marginBottom: '20px', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', background: '#fff' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                      <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '15px', fontWeight: '700' }}>📅 {month}</h3>
-                      <div style={{ display: 'flex', gap: '8px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
-                        <span style={{ background: '#d1fae5', color: '#065f46', padding: '3px 8px', borderRadius: '6px' }}>Rev: Rs. {mData.totalRevenue.toLocaleString('en-IN')}</span>
-                        <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: '6px' }}>Joined: {mData.joinedCount}</span>
+              Object.keys(monthlyData)
+                .filter(month => selectedReportMonth === 'All' || month === selectedReportMonth)
+                .map((month) => {
+                  const mData = monthlyData[month];
+                  
+                  // Sort HRs by revenue descending to find Top HR
+                  const sortedHRs = Object.keys(mData.recruiters).sort((a, b) => mData.recruiters[b].revenue - mData.recruiters[a].revenue);
+                  const topHRName = sortedHRs[0] || 'N/A';
+
+                  return (
+                    <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                        <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
+                        <div style={{ display: 'flex', gap: '10px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
+                          <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '6px' }}>Total Rev: Rs. {mData.totalRevenue.toLocaleString('en-IN')}</span>
+                          <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: '6px' }}>Total Selections: {mData.joinedCount}</span>
+                          <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '6px' }}>Total Drops: {mData.droppedCount}</span>
+                          <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: '6px' }}>🏆 Top HR: {topHRName}</span>
+                        </div>
+                      </div>
+
+                      <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#334155', fontWeight: '700' }}>HR Individual Performance & 1-Click Monthly Reports:</h4>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                        {Object.keys(mData.recruiters).map(hrName => {
+                          const hrStats = mData.recruiters[hrName];
+                          const hasEmailRegistered = hrEmailDirectory[hrName];
+
+                          return (
+                            <div key={hrName} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                  <strong style={{ fontSize: '13px', color: '#0f172a' }}>👤 {hrName}</strong>
+                                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#059669', background: '#d1fae5', padding: '2px 6px', borderRadius: '4px' }}>Rs. {hrStats.revenue.toLocaleString('en-IN')}</span>
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#475569', marginBottom: '8px', display: 'flex', gap: '12px' }}>
+                                  <span>Joined/Selected: <strong>{hrStats.joined}</strong></span>
+                                  <span>Dropped: <strong style={{ color: '#ef4444' }}>{hrStats.dropped}</strong></span>
+                                </div>
+                              </div>
+
+                              {hasEmailRegistered ? (
+                                <button 
+                                  onClick={() => sendHRPerformanceEmail(hrName, month, hrStats)}
+                                  style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}
+                                  title={`Send performance report to ${hrName}`}
+                                >
+                                  ✉️ Email Report to {hrName}
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', marginTop: '6px' }}>Email not configured</span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
             )}
           </div>
         ) : (
@@ -771,7 +887,7 @@ export default function App() {
                 </form>
               </div>
 
-              {/* Data Display Section (Table for Desktop, Cards for Mobile) */}
+              {/* Data Display Section */}
               <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                   <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Directory ({filteredCandidates.length})</h3>
