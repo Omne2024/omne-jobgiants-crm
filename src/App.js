@@ -69,16 +69,22 @@ export default function App() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    let response;
+
     if (isEditing) {
-      await supabase.from('candidates').update(formData).eq('id', currentId);
+      response = await supabase.from('candidates').update(formData).eq('id', currentId);
     } else {
-      await supabase.from('candidates').insert([
-        { ...formData, user_email: session.user.email, recruiter_email: session.user.email }
-      ]);
+      response = await supabase.from('candidates').insert([formData]);
     }
-    setFormData({ name: '', recruiter: '', joining_date: '', revenue: '', status: 'Joined', invoice_status: 'Pending' });
-    setIsEditing(false);
-    fetchCandidates();
+
+    if (response && response.error) {
+      console.error("Supabase Save Error:", response.error);
+      alert("Save nahi ho paya: " + response.error.message);
+    } else {
+      setFormData({ name: '', recruiter: '', joining_date: '', revenue: '', status: 'Joined', invoice_status: 'Pending' });
+      setIsEditing(false);
+      fetchCandidates();
+    }
   };
 
   const generateInvoicePDF = (candidate) => {
