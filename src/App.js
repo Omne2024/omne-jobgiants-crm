@@ -212,6 +212,20 @@ export default function App() {
       console.error("Supabase Save Error:", response.error);
       alert("Failed to save: " + response.error.message);
     } else {
+      // If edited by Partner, log audit entry
+      if (userRole === 'Partner' && isEditing) {
+        const nowObj = new Date();
+        const logPayload = {
+          partner_email: loginEmail.trim().toLowerCase(),
+          action_type: 'EDIT',
+          candidate_name: formData.name,
+          candidate_company: formData.company_name || 'N/A',
+          action_timestamp: nowObj.toISOString()
+        };
+        await supabase.from('audit_logs').insert([logPayload]);
+        fetchAuditLogs();
+      }
+
       alert("Candidate successfully saved!");
       setFormData({ 
         name: '', 
@@ -308,7 +322,7 @@ export default function App() {
       if (error) {
         alert("Failed to delete: " + error.message);
       } else {
-        // If deleted by Partner, record audit log entry
+        // If deleted by Partner, record audit log entry instantly
         if (userRole === 'Partner') {
           const nowObj = new Date();
           const logPayload = {
@@ -913,11 +927,11 @@ export default function App() {
               🛡️ Partner Portal Activity & Deletion Audit History
             </h2>
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
-              Yeh log track karta hai ki kis partner email se kis candidate ko kab aur kitne baje delete kiya gaya hai.
+              This log tracks which partner email performed which action (edit or delete) on which candidate, along with the exact date and time.
             </p>
 
             {auditLogs.length === 0 ? (
-              <p style={{ color: '#64748b', fontSize: '13px' }}>No deletion or action history recorded yet.</p>
+              <p style={{ color: '#64748b', fontSize: '13px' }}>No deletion or edit action history recorded yet.</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
@@ -938,7 +952,7 @@ export default function App() {
                         <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '10px', fontWeight: '700', color: '#4f46e5' }}>{log.partner_email}</td>
                           <td style={{ padding: '10px' }}>
-                            <span style={{ padding: '2px 8px', borderRadius: '10px', fontWeight: '700', background: '#fee2e2', color: '#991b1b', fontSize: '10px' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '10px', fontWeight: '700', background: log.action_type === 'DELETE' ? '#fee2e2' : '#e0e7ff', color: log.action_type === 'DELETE' ? '#991b1b' : '#3730a3', fontSize: '10px' }}>
                               {log.action_type}
                             </span>
                           </td>
@@ -1174,7 +1188,7 @@ export default function App() {
               {/* Form Card */}
               <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', height: 'fit-content' }}>
                 <h3 style={{ marginTop: 0, marginBottom: '14px', fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
-                  {userRole === 'HR' ? (isEditing ? '✏️ Edit Entry' : `📝 Daily Entry Form (${currentLoggedInHRName})`) : (isEditing ? '✏️ Edit Candidate' : '➕ Add Candidate')}
+                  {userRole === 'HR' ? (isEditing ? '✏️ Edit Entry' : `📝 Daily Entry Form (${currentLoggedInHRName})`) : (isEditing ? '✏️️ Edit Candidate' : '➕ Add Candidate')}
                 </h3>
                 <form onSubmit={handleFormSubmit}>
                   <div style={{ marginBottom: '10px' }}>
@@ -1366,7 +1380,7 @@ export default function App() {
                           <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9', opacity: (item.status === 'Dropped' || item.status === 'Rejected') ? 0.6 : 1 }}>
                             <td style={{ padding: '10px' }}>
                               <div onClick={() => setSelectedCandidate(item)} style={{ fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}>{item.name}</div>
-                              <div style={{ fontSize: '10px', color: '#64748b' }}>📞 {item.phone || 'N/A'} • ✉️️ {item.email || 'N/A'}</div>
+                              <div style={{ fontSize: '10px', color: '#64748b' }}>📞 {item.phone || 'N/A'} • ✉️ {item.email || 'N/A'}</div>
                             </td>
                             <td style={{ padding: '10px' }}>
                               <div style={{ fontWeight: '700', color: '#1e293b' }}>🏢 {item.company_name || 'N/A'}</div>
