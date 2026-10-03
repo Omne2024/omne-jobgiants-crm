@@ -82,7 +82,7 @@ export default function App() {
         
         let currentInvoiceStatus = item.invoice_status;
         if (item.status === 'Dropped' || item.status === 'Rejected') {
-          currentInvoiceStatus = 'Dropped';
+          currentInvoiceStatus = 'Cancelled'; // <-- Dropped/Rejected par 'Cancelled' set hoga
         } else if (diffDays >= 90 && currentInvoiceStatus === 'Pending') {
           currentInvoiceStatus = 'Ready to Invoice';
         }
@@ -107,7 +107,7 @@ export default function App() {
 
     let updatedInvoiceStatus = formData.invoice_status;
     if (formData.status === 'Dropped' || formData.status === 'Rejected') {
-      updatedInvoiceStatus = 'Dropped';
+      updatedInvoiceStatus = 'Cancelled'; // <-- Form submit par bhi 'Cancelled'
     }
 
     const payload = {
@@ -195,6 +195,9 @@ export default function App() {
           obj[h] = val;
         });
 
+        const statusVal = obj.status || 'Yet to Join';
+        const invStatus = (statusVal === 'Dropped' || statusVal === 'Rejected') ? 'Cancelled' : 'Pending';
+
         batchData.push({
           name: obj.name || 'Unknown',
           email: obj.email || '',
@@ -204,8 +207,8 @@ export default function App() {
           recruiter: obj.recruiter ? obj.recruiter.trim() : 'Sanchi',
           joining_date: obj.joining_date || new Date().toISOString().split('T')[0],
           revenue: obj.revenue || 0,
-          status: obj.status || 'Yet to Join',
-          invoice_status: (obj.status === 'Dropped' || obj.status === 'Rejected') ? 'Dropped' : 'Pending'
+          status: statusVal,
+          invoice_status: invStatus
         });
       }
 
@@ -359,7 +362,6 @@ export default function App() {
           background-color: #f1f5f9 !important;
         }
 
-        /* Responsive Layout Grid Styling */
         .responsive-grid {
           display: grid;
           grid-template-columns: 1fr 2.8fr;
@@ -372,7 +374,6 @@ export default function App() {
           margin-bottom: 20px;
         }
 
-        /* Mobile Screens ke liye Media Query */
         @media (max-width: 900px) {
           .responsive-grid {
             grid-template-columns: 1fr !important;
@@ -403,7 +404,6 @@ export default function App() {
         pointerEvents: 'none'
       }} />
 
-      {/* Main Content Wrapper */}
       <div className="animated-container" style={{ position: 'relative', zIndex: 1 }}>
         
         {/* Header Section */}
@@ -699,7 +699,14 @@ export default function App() {
                               </span>
                             </td>
                             <td style={{ padding: '8px' }}>
-                              <span style={{ padding: '3px 6px', borderRadius: '10px', fontSize: '10px', fontWeight: 'bold', backgroundColor: item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : item.invoice_status === 'Dropped' ? '#fee2e2' : '#f3f4f6' }}>
+                              <span style={{ 
+                                padding: '3px 6px', 
+                                borderRadius: '10px', 
+                                fontSize: '10px', 
+                                fontWeight: 'bold', 
+                                backgroundColor: item.invoice_status === 'Cancelled' ? '#fee2e2' : item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : '#f3f4f6',
+                                color: item.invoice_status === 'Cancelled' ? '#991b1b' : 'inherit'
+                              }}>
                                 {item.invoice_status}
                               </span>
                             </td>
