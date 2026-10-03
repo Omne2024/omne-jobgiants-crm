@@ -25,11 +25,11 @@ export default function App() {
   const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey'];
   const predefinedCompanies = ['Transom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
 
-  // HR Email & Password Mapping Database
+  // HR Email & Password Mapping Database with exact passwords requested
   const hrDatabase = {
-    'sanchi.aggarwal@jobgiants.in': { name: 'Sanchi', password: 'Sanchi@2026' },
-    'sadaf.kazi@jobgiants.in': { name: 'Sadaf', password: 'Sadaf@2026' },
-    'anjali.srivastava@jobgiants.in': { name: 'Anjali', password: 'Anjali@2026' }
+    'sanchi.aggarwal@jobgiants.in': { name: 'Sanchi', password: 'Sanwall@2024' },
+    'sadaf.kazi@jobgiants.in': { name: 'Sadaf', password: 'Sadkaz@2025' },
+    'anjali.srivastava@jobgiants.in': { name: 'Anjali', password: 'Anjsri@2026' }
   };
 
   const partnerEmails = ['suraj.jha@jobgiants.in', 'garimabansal@jobgiants.in'];
@@ -88,7 +88,7 @@ export default function App() {
         setUserRole('Partner');
         setIsLoggedIn(true);
       } else {
-        alert('Invalid Partner Email or Password! (Allowed: suraj.jha@jobgiants.in, garimabansal@jobgiants.in | Password: Inteca@1100145)');
+        alert('Invalid Credentials');
       }
     } else {
       // HR Login
@@ -98,7 +98,7 @@ export default function App() {
         setIsLoggedIn(true);
         setFormData(prev => ({ ...prev, recruiter: hrRecord.name }));
       } else {
-        alert('Invalid HR Email or Password! Kripya sahi email aur password daalein.');
+        alert('Invalid Credentials');
       }
     }
   };
