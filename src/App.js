@@ -41,6 +41,7 @@ export default function App() {
     recruiter: '',
     company_name: '',
     process_name: '',
+    client_poc: '',
     selection_date: '',
     joining_date: '',
     revenue: '',
@@ -165,22 +166,28 @@ export default function App() {
       updatedInvoiceStatus = 'Cancelled';
     }
 
+    // Safely formatting dates to avoid empty string syntax errors in Supabase
+    const cleanSelectionDate = formData.selection_date && formData.selection_date.trim() !== '' ? formData.selection_date : null;
+    const cleanJoiningDate = formData.joining_date && formData.joining_date.trim() !== '' ? formData.joining_date : null;
+    const cleanPaymentDate = formData.payment_date && formData.payment_date.trim() !== '' ? formData.payment_date : null;
+
     const payload = {
       name: formData.name,
       email: formData.email,
       phone: formData.phone,
       company_name: formData.company_name,
       process_name: formData.process_name,
-      selection_date: formData.selection_date || null,
-      joining_date: formData.joining_date || null,
+      client_poc: formData.client_poc || '',
+      selection_date: cleanSelectionDate,
+      joining_date: cleanJoiningDate,
       recruiter: finalRecruiter,
       status: formData.status,
       revenue: userRole === 'HR' ? 0 : (parseFloat(formData.revenue) || 0),
       invoice_status: updatedInvoiceStatus,
-      invoice_number: formData.invoice_number,
-      payment_date: formData.payment_date,
+      invoice_number: formData.invoice_number || '',
+      payment_date: cleanPaymentDate,
       payment_mode: formData.payment_mode,
-      notes: formData.notes
+      notes: formData.notes || ''
     };
 
     let response;
@@ -202,6 +209,7 @@ export default function App() {
         recruiter: userRole === 'HR' ? loggedInHRName : '', 
         company_name: '', 
         process_name: '', 
+        client_poc: '',
         selection_date: '',
         joining_date: '', 
         revenue: '', 
@@ -285,9 +293,9 @@ export default function App() {
 
   const downloadSampleCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
-      + "name,email,phone,company_name,process_name,recruiter,selection_date,joining_date,revenue,status,notes\n"
-      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
-      + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
+      + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
+      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
+      + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -329,6 +337,7 @@ export default function App() {
           phone: obj.phone || '',
           company_name: obj.company_name || 'Transom',
           process_name: obj.process_name || 'General',
+          client_poc: obj.client_poc || '',
           recruiter: obj.recruiter ? obj.recruiter.trim() : 'Sanchi',
           selection_date: obj.selection_date || null,
           joining_date: obj.joining_date || null,
@@ -450,6 +459,7 @@ export default function App() {
       item.recruiter.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.company_name && item.company_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.process_name && item.process_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.client_poc && item.client_poc.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.phone && item.phone.includes(searchTerm));
     
@@ -842,7 +852,7 @@ export default function App() {
                                   style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}
                                   title={`Send performance report to ${hrName}`}
                                 >
-                                  ✉️ Email Report to {hrName}
+                                  ✉️️ Email Report to {hrName}
                                 </button>
                               ) : (
                                 <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', marginTop: '6px' }}>Email not configured</span>
@@ -1003,7 +1013,7 @@ export default function App() {
                       {userRole === 'HR' ? 'Submit Entry 🚀' : (isEditing ? 'Update Candidate' : 'Save Candidate')}
                     </button>
                     {isEditing && (
-                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '9px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '9px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
                         Cancel
                       </button>
                     )}
