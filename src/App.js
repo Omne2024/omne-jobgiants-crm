@@ -8,15 +8,11 @@ const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  
-  // Auth States
-  const [authEmail, setAuthEmail] = useState('');
-  const [requestedRole, setRequestedRole] = useState('Recruiter');
-  const [authMessage, setAuthMessage] = useState('');
-  const [userRole, setUserRole] = useState('Recruiter');
-  const [approvalStatus, setApprovalStatus] = useState('pending');
+  // Authentication bypass: Directly setting session & Partner role
+  const [session] = useState({ user: { email: 'suraj.jha@jobgiants.in' } });
+  const [loading, setLoading] = useState(false);
+  const [userRole, setUserRole] = useState('Partner');
+  const [approvalStatus] = useState('approved');
 
   // Admin Pending Approvals
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -39,60 +35,12 @@ export default function App() {
   const [filterInvoiceStatus, setFilterInvoiceStatus] = useState('All');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) checkUserStatus(session.user);
-      else setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) checkUserStatus(session.user);
-      else setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    fetchCandidates();
+    fetchPendingApprovals();
   }, []);
-
-  const checkUserStatus = async (user) => {
-    setLoading(true);
-    const role = user?.user_metadata?.role || 'Recruiter';
-    setUserRole(role);
-
-    // Check Approval Status in DB
-    const { data } = await supabase
-      .from('user_approvals')
-      .select('status, requested_role')
-      .eq('id', user.id)
-      .single();
-
-    if (data) {
-      setApprovalStatus(data.status);
-    } else {
-      // First time user registration entry
-      await supabase.from('user_approvals').insert([
-        { id: user.id, email: user.email, requested_role: role, status: role === 'Partner' ? 'approved' : 'pending' }
-      ]);
-      setApprovalStatus(role === 'Partner' ? 'approved' : 'pending');
-    }
-
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (session && approvalStatus === 'approved') {
-      fetchCandidates();
-      if (userRole === 'Partner') {
-        fetchPendingApprovals();
-      }
-    }
-  }, [session, approvalStatus, userRole]);
 
   const fetchCandidates = async () => {
     let query = supabase.from('candidates').select('*');
-    if (userRole === 'Recruiter') {
-      query = query.eq('recruiter_email', session.user.email);
-    }
     const { data } = await query.order('joining_date', { ascending: false });
 
     if (data) {
@@ -118,19 +66,6 @@ export default function App() {
     await supabase.from('user_approvals').update({ status: newStatus }).eq('id', user.id);
     fetchPendingApprovals();
   };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setAuthMessage('Sending Magic Link...');
-    const { error } = await supabase.auth.signInWithOtp({
-      email: authEmail,
-      options: { data: { role: requestedRole } }
-    });
-    if (error) setAuthMessage('Error: ' + error.message);
-    else setAuthMessage('Magic Link sent! Check your email to complete login.');
-  };
-
-  const handleLogout = () => supabase.auth.signOut();
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -194,72 +129,6 @@ export default function App() {
     return <div style={{ textAlign: 'center', marginTop: '100px', fontFamily: 'sans-serif' }}>Loading Omne JobGiants CRM...</div>;
   }
 
-  // Not Logged In
-  if (!session) {
-    return (
-      <div style={{ maxWidth: '400px', margin: '80px auto', padding: '30px', border: '1px solid #e0e0e0', borderRadius: '8px', fontFamily: 'sans-serif', backgroundColor: '#fff' }}>
-        <h2 style={{ color: '#16a34a', marginTop: 0 }}>Omne JobGiants CRM</h2>
-        <p style={{ color: '#666', fontSize: '14px' }}>Sign in / Request Access</p>
-        <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Email Address</label>
-            <input
-              type="email"
-              placeholder="your-email@gmail.com"
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
-              required
-              style={{ width: '100%', padding: '10px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-            />
-          </div>
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Requested Role</label>
-            <select
-              value={requestedRole}
-              onChange={(e) => setRequestedRole(e.target.value)}
-              style={{ width: '100%', padding: '10px', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
-            >
-              <option value="Recruiter">Recruiter</option>
-              <option value="Partner">Partner / Admin</option>
-            </select>
-          </div>
-          <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
-            Send Magic Link
-          </button>
-        </form>
-        {authMessage && <p style={{ marginTop: '15px', fontSize: '13px', color: '#2563eb' }}>{authMessage}</p>}
-      </div>
-    );
-  }
-
-  // Pending Approval State
-  if (approvalStatus === 'pending') {
-    return (
-      <div style={{ maxWidth: '500px', margin: '100px auto', padding: '30px', textAlign: 'center', fontFamily: 'sans-serif', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ color: '#d97706', marginTop: 0 }}>Approval Pending</h2>
-        <p style={{ color: '#4b5563', lineHeight: '1.5' }}>
-          Your account (<strong>{session.user.email}</strong>) is currently waiting for Partner/Admin approval.
-        </p>
-        <p style={{ fontSize: '13px', color: '#6b7280' }}>Please contact the Administrator to get access activated.</p>
-        <button onClick={handleLogout} style={{ marginTop: '15px', padding: '8px 16px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-          Logout
-        </button>
-      </div>
-    );
-  }
-
-  if (approvalStatus === 'rejected') {
-    return (
-      <div style={{ maxWidth: '500px', margin: '100px auto', padding: '30px', textAlign: 'center', fontFamily: 'sans-serif', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ color: '#dc2626', marginTop: 0 }}>Access Denied</h2>
-        <p style={{ color: '#4b5563' }}>Your access request was declined by the Admin.</p>
-        <button onClick={handleLogout} style={{ marginTop: '15px', padding: '8px 16px', backgroundColor: '#6b7280', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          Logout
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#f9fafb', minHeight: '100vh' }}>
       {/* Header */}
@@ -267,12 +136,12 @@ export default function App() {
         <div>
           <h1 style={{ margin: 0, fontSize: '22px' }}>Omne JobGiants Consultancy Services</h1>
           <span style={{ fontSize: '12px', color: '#6b7280' }}>
-            LoggedIn: {session.user.email} | <strong>Role: {userRole}</strong>
+            Direct Access Mode | <strong>Role: {userRole}</strong>
           </span>
         </div>
-        <button onClick={handleLogout} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-          Logout
-        </button>
+        <div style={{ backgroundColor: '#16a34a', color: '#fff', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+          Auth Bypassed Successfully
+        </div>
       </div>
 
       {/* Admin Pending Approvals Panel */}
