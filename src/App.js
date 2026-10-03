@@ -550,6 +550,21 @@ export default function App() {
               📧 Report
             </button>
 
+            {/* CSV Template Download Button */}
+            <button 
+              onClick={downloadSampleCSV} 
+              style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              title="Download Sample CSV Template"
+            >
+              📥 CSV Template
+            </button>
+
+            {/* Bulk Upload File Input */}
+            <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }} title="Upload Bulk Candidates via CSV">
+              📂 Bulk Upload
+              <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+            </label>
+
             <label style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '7px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
               🖼 Logo
               <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
@@ -837,7 +852,7 @@ export default function App() {
                   </table>
                 </div>
 
-                {/* MOBILE CARD VIEW (Optimized for Small Screens) */}
+                {/* MOBILE CARD VIEW */}
                 <div className="mobile-card-view">
                   {filteredCandidates.length === 0 ? (
                     <p style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '20px' }}>No candidates found.</p>
