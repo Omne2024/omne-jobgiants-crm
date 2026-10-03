@@ -15,7 +15,6 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   
-  // CRM ke andar se Logo manage karne ke liye state (localStorage support ke sath)
   const [companyLogo, setCompanyLogo] = useState(() => {
     return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
   });
@@ -44,7 +43,6 @@ export default function App() {
     fetchCandidates();
   }, []);
 
-  // CRM ke andar se direct logo upload karke save karne ka function
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -312,6 +310,37 @@ export default function App() {
   return (
     <div style={{ position: 'relative', padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#f9fafb', minHeight: '100vh', overflow: 'hidden' }}>
       
+      {/* CSS Animations style tag */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes zoomIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animated-container {
+          animation: fadeIn 0.4s ease-out forwards;
+        }
+        .animated-modal {
+          animation: zoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        button, label {
+          transition: all 0.2s ease-in-out;
+        }
+        button:hover, label:hover {
+          transform: translateY(-2px);
+          filter: brightness(1.05);
+        }
+        button:active, label:active {
+          transform: translateY(0);
+        }
+        tr.hover-effect:hover {
+          background-color: #f1f5f9 !important;
+        }
+      `}</style>
+
       {/* Background Watermark Logo */}
       <div style={{
         position: 'fixed',
@@ -330,7 +359,7 @@ export default function App() {
       }} />
 
       {/* Main Content Wrapper */}
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div className="animated-container" style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '15px 25px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src={companyLogo} alt="Logo" style={{ width: '45px', height: '45px', objectFit: 'contain', borderRadius: '50%', backgroundColor: '#f3f4f6' }} />
@@ -343,19 +372,18 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             
-            {/* CRM ke andar se Logo Change karne ka Button */}
-            <label style={{ backgroundColor: '#7c3aed', color: '#fff', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+            <label style={{ backgroundColor: '#7c3aed', color: '#fff', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
               🖼️ Upload/Change Logo
               <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
             </label>
 
             <button 
               onClick={downloadSampleCSV} 
-              style={{ backgroundColor: '#4b5563', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+              style={{ backgroundColor: '#4b5563', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
               📥 Download Sample Excel Template
             </button>
 
-            <label style={{ backgroundColor: '#0284c7', color: '#fff', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+            <label style={{ backgroundColor: '#0284c7', color: '#fff', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
               📁 Upload Filled Excel/CSV
               <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
             </label>
@@ -405,7 +433,7 @@ export default function App() {
                           {Object.keys(mData.recruiters).map((rec) => {
                             const recStats = mData.recruiters[rec];
                             return (
-                              <tr key={rec} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <tr key={rec} className="hover-effect" style={{ borderBottom: '1px solid #e5e7eb', transition: 'background-color 0.2s' }}>
                                 <td style={{ padding: '8px 12px', fontWeight: 'bold' }}>👤 {rec}</td>
                                 <td style={{ padding: '8px 12px', color: '#065f46', fontWeight: 'bold' }}>{recStats.joined} Joined</td>
                                 <td style={{ padding: '8px 12px', color: '#991b1b', fontWeight: 'bold' }}>{recStats.dropped} Dropped</td>
@@ -424,11 +452,11 @@ export default function App() {
           <>
             {userRole === 'Partner' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                <div style={{ backgroundColor: '#16a34a', color: '#fff', padding: '20px', borderRadius: '8px' }}>
+                <div style={{ backgroundColor: '#16a34a', color: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                   <h3 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', opacity: 0.9 }}>Active Revenue Pipeline (Excl. Dropped)</h3>
                   <p style={{ margin: '5px 0 0 0', fontSize: '28px', fontWeight: 'bold' }}>Rs. {totalRevenue.toLocaleString('en-IN')}</p>
                 </div>
-                <div style={{ backgroundColor: '#2563eb', color: '#fff', padding: '20px', borderRadius: '8px' }}>
+                <div style={{ backgroundColor: '#2563eb', color: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                   <h3 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase', opacity: 0.9 }}>Active Lateral Hirings (≥ Rs. 30k)</h3>
                   <p style={{ margin: '5px 0 0 0', fontSize: '28px', fontWeight: 'bold' }}>{lateralHiringCount} Candidates</p>
                 </div>
@@ -536,7 +564,7 @@ export default function App() {
                         const isLateral = rev >= 30000 && item.status !== 'Dropped' && item.status !== 'Rejected';
                         
                         return (
-                          <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb', opacity: (item.status === 'Dropped' || item.status === 'Rejected') ? 0.6 : 1 }}>
+                          <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #e5e7eb', opacity: (item.status === 'Dropped' || item.status === 'Rejected') ? 0.6 : 1, transition: 'background-color 0.2s' }}>
                             <td style={{ padding: '10px' }}>
                               <div 
                                 onClick={() => setSelectedCandidate(item)} 
@@ -607,7 +635,7 @@ export default function App() {
 
         {selectedCandidate && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-            <div style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', width: '400px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+            <div className="animated-modal" style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', width: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
               <h3 style={{ marginTop: 0, color: '#1f2937', borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}>Candidate Details</h3>
               <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#374151' }}>
                 <p><strong>Name:</strong> {selectedCandidate.name}</p>
