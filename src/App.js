@@ -54,7 +54,6 @@ export default function App() {
   const [paymentDateInput, setPaymentDateInput] = useState('');
   const [paymentModeInput, setPaymentModeInput] = useState('NEFT');
 
-  // Multi-candidate invoice modal state
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [selectedForBatchInvoice, setSelectedForBatchInvoice] = useState([]);
   const [batchInvoiceNumber, setBatchInvoiceNumber] = useState('');
@@ -399,7 +398,7 @@ export default function App() {
   });
 
   return (
-    <div style={{ position: 'relative', padding: '20px', fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', overflowX: 'hidden' }}>
+    <div style={{ position: 'relative', padding: '12px', fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', overflowX: 'hidden', boxSizing: 'border-box' }}>
       
       <style>{`
         @keyframes fadeIn {
@@ -425,7 +424,7 @@ export default function App() {
           animation: pulseGlow 2s infinite;
         }
         .glass-card {
-          background: rgba(255, 255, 255, 0.85);
+          background: rgba(255, 255, 255, 0.9);
           backdrop-filter: blur(12px);
           border: 1px solid rgba(226, 232, 240, 0.8);
         }
@@ -450,23 +449,38 @@ export default function App() {
         tr.hover-effect:hover {
           background-color: #f8fafc !important;
         }
+
+        /* Responsive Layout Switchers */
         .responsive-grid {
           display: grid;
-          grid-template-columns: 1fr 2.9fr;
-          gap: 24px;
+          grid-template-columns: 1fr 2.8fr;
+          gap: 20px;
         }
         .responsive-stats {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-bottom: 24px;
+          gap: 16px;
+          margin-bottom: 20px;
         }
-        @media (max-width: 1024px) {
+        .desktop-table-view {
+          display: block;
+        }
+        .mobile-card-view {
+          display: none;
+        }
+
+        @media (max-width: 900px) {
           .responsive-grid {
             grid-template-columns: 1fr !important;
           }
           .responsive-stats {
             grid-template-columns: 1fr !important;
+          }
+          .desktop-table-view {
+            display: none !important;
+          }
+          .mobile-card-view {
+            display: block !important;
           }
         }
       `}</style>
@@ -477,38 +491,36 @@ export default function App() {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '400px',
-        height: '400px',
+        width: '350px',
+        height: '350px',
         backgroundImage: `url("${companyLogo}")`,
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'center',
         backgroundSize: 'contain',
-        opacity: 0.04,
+        opacity: 0.03,
         zIndex: 0,
         pointerEvents: 'none'
       }} />
 
       <div className="animated-container" style={{ position: 'relative', zIndex: 1, maxWidth: '1400px', margin: '0 auto' }}>
         
-        {/* Modern Header Navbar with Notification Bell */}
-        <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderRadius: '16px', marginBottom: '24px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ padding: '4px', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', borderRadius: '50%', display: 'flex' }}>
-              <img src={companyLogo} alt="Logo" style={{ width: '42px', height: '42px', objectFit: 'contain', borderRadius: '50%', backgroundColor: '#fff' }} />
+        {/* Modern Header Navbar */}
+        <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', flexWrap: 'wrap', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ padding: '3px', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', borderRadius: '50%', display: 'flex' }}>
+              <img src={companyLogo} alt="Logo" style={{ width: '38px', height: '38px', objectFit: 'contain', borderRadius: '50%', backgroundColor: '#fff' }} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', background: 'linear-gradient(to right, #1e293b, #475569)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                Omne JobGiants Consultancy
+              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '800', background: 'linear-gradient(to right, #1e293b, #475569)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Omne JobGiants
               </h1>
-              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>
-                Enterprise Recruitment CRM • <strong style={{ color: '#4f46e5' }}>{userRole} Mode</strong>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>
+                CRM • <strong style={{ color: '#4f46e5' }}>{userRole}</strong>
               </span>
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            
-            {/* Notification Bell for Pending Invoices */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ position: 'relative' }}>
               <button 
                 onClick={() => setFilterInvoiceStatus('Invoice Raised / Pending Clearance')}
@@ -516,100 +528,87 @@ export default function App() {
                   background: pendingInvoicesList.length > 0 ? '#ef4444' : '#e2e8f0', 
                   color: pendingInvoicesList.length > 0 ? '#fff' : '#334155', 
                   border: 'none', 
-                  padding: '8px 12px', 
+                  padding: '7px 10px', 
                   borderRadius: '8px', 
-                  fontSize: '12px', 
+                  fontSize: '11px', 
                   fontWeight: '700', 
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: pendingInvoicesList.length > 0 ? '0 2px 8px rgba(239, 68, 68, 0.4)' : 'none'
+                  gap: '4px'
                 }}
                 title="Pending Invoices Clearance Alert"
               >
-                🔔 Pending Invoices ({pendingInvoicesList.length})
+                🔔 Pending ({pendingInvoicesList.length})
               </button>
             </div>
 
             <button 
               onClick={sendMonthlyReportEmail} 
-              style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)' }}
+              style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
             >
-              📧 Send Monthly Report (Gmail)
+              📧 Report
             </button>
 
-            <label style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <label style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '7px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
               🖼 Logo
               <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
             </label>
 
-            <button 
-              onClick={downloadSampleCSV} 
-              style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-              📥 Template
-            </button>
-
-            <label style={{ background: '#0284c7', color: '#fff', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)' }}>
-              📁 Import CSV
-              <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
-            </label>
-
-            <div style={{ display: 'flex', background: '#e2e8f0', padding: '3px', borderRadius: '10px', gap: '2px' }}>
+            <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px', gap: '2px' }}>
               <button 
                 onClick={() => setActiveTab('dashboard')} 
-                style={{ padding: '6px 14px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', boxShadow: activeTab === 'dashboard' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none' }}>
-                Dashboard
+                style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
+                Dash
               </button>
               <button 
                 onClick={() => setActiveTab('reports')} 
-                style={{ padding: '6px 14px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', boxShadow: activeTab === 'reports' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none' }}>
+                style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
                 Reports
               </button>
             </div>
           </div>
         </div>
 
-        {/* Ready to Invoice Notification Alert & Batch Invoice Generator Trigger */}
+        {/* Ready to Invoice Alert Banner */}
         {readyToInvoiceList.length > 0 && (
-          <div className="invoice-alert" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #f59e0b', padding: '14px 20px', borderRadius: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '20px' }}>⚡</span>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: '#92400e' }}>
-                {readyToInvoiceList.length} candidate(s) have completed 90 days! Group and assign an Invoice Number.
+          <div className="invoice-alert" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #f59e0b', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>⚡</span>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
+                {readyToInvoiceList.length} candidate(s) completed 90 days! Create group invoice number.
               </span>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button 
                 onClick={() => setShowInvoiceModal(true)} 
-                style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 4px rgba(79, 70, 229, 0.3)' }}>
-                ➕ Create Group Invoice Number
+                style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                ➕ Create Invoice #
               </button>
               <button 
                 onClick={() => setFilterInvoiceStatus('Ready to Invoice')} 
-                style={{ background: '#d97706', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                Filter Ready Invoices
+                style={{ background: '#d97706', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                Filter Ready
               </button>
             </div>
           </div>
         )}
 
         {activeTab === 'reports' ? (
-          <div className="glass-card" style={{ padding: '24px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-            <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#0f172a', fontSize: '18px', fontWeight: '800' }}>Month-wise Revenue & Internal HR Performance</h2>
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '16px', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>Month-wise Revenue & HR Performance</h2>
             {Object.keys(monthlyData).length === 0 ? (
-              <p style={{ color: '#64748b' }}>No data records found.</p>
+              <p style={{ color: '#64748b', fontSize: '13px' }}>No data records found.</p>
             ) : (
               Object.keys(monthlyData).map((month) => {
                 const mData = monthlyData[month];
                 return (
-                  <div key={month} style={{ marginBottom: '25px', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
-                      <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '700' }}>📅 {month}</h3>
-                      <div style={{ display: 'flex', gap: '10px', fontSize: '12px', fontWeight: '700', flexWrap: 'wrap' }}>
-                        <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '8px' }}>Revenue: Rs. {mData.totalRevenue.toLocaleString('en-IN')}</span>
-                        <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: '8px' }}>Joined: {mData.joinedCount}</span>
-                        <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '8px' }}>Dropped: {mData.droppedCount}</span>
+                  <div key={month} style={{ marginBottom: '20px', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', background: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                      <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '15px', fontWeight: '700' }}>📅 {month}</h3>
+                      <div style={{ display: 'flex', gap: '8px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
+                        <span style={{ background: '#d1fae5', color: '#065f46', padding: '3px 8px', borderRadius: '6px' }}>Rev: Rs. {mData.totalRevenue.toLocaleString('en-IN')}</span>
+                        <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: '6px' }}>Joined: {mData.joinedCount}</span>
                       </div>
                     </div>
                   </div>
@@ -621,17 +620,17 @@ export default function App() {
           <>
             {userRole === 'Partner' && (
               <div className="responsive-stats">
-                <div style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)' }}>
-                  <h3 style={{ margin: 0, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
+                <div style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', padding: '16px', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.2)' }}>
+                  <h3 style={{ margin: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
                     {filterHR === 'All' ? 'Active Revenue Pipeline' : `Revenue (${filterHR})`}
                   </h3>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '800' }}>Rs. {totalRevenue.toLocaleString('en-IN')}</p>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '24px', fontWeight: '800' }}>Rs. {totalRevenue.toLocaleString('en-IN')}</p>
                 </div>
-                <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)' }}>
-                  <h3 style={{ margin: 0, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
+                <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '16px', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.2)' }}>
+                  <h3 style={{ margin: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
                     {filterHR === 'All' ? 'Active Lateral Hirings (≥ 30k)' : `Lateral Hirings (${filterHR})`}
                   </h3>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '800' }}>{lateralHiringCount} Candidates</p>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '24px', fontWeight: '800' }}>{lateralHiringCount} Candidates</p>
                 </div>
               </div>
             )}
@@ -639,32 +638,28 @@ export default function App() {
             <div className="responsive-grid">
               
               {/* Form Card */}
-              <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', height: 'fit-content' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>
-                  {isEditing ? '✏️ Edit Candidate Record' : '➕ Add New Candidate'}
+              <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', height: 'fit-content' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '14px', fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
+                  {isEditing ? '✏️ Edit Candidate' : '➕ Add Candidate'}
                 </h3>
                 <form onSubmit={handleFormSubmit}>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Candidate Name *</label>
-                    <input type="text" className="modern-input" placeholder="e.g. Rahul Sharma" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Candidate Name *</label>
+                    <input type="text" className="modern-input" placeholder="e.g. Rahul Sharma" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
                   </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Email Address</label>
-                    <input type="email" className="modern-input" placeholder="candidate@email.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
-                  </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Phone Number</label>
-                    <input type="text" className="modern-input" placeholder="9876543210" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Phone Number</label>
+                    <input type="text" className="modern-input" placeholder="9876543210" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
                   </div>
 
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Company Name *</label>
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Company Name *</label>
                     <select 
                       className="modern-input"
                       value={formData.company_name} 
                       onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} 
                       required 
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '13px' }}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '12px' }}
                     >
                       <option value="" disabled>-- Select Client Company --</option>
                       {predefinedCompanies.map(comp => (
@@ -673,18 +668,13 @@ export default function App() {
                     </select>
                   </div>
 
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Process Name *</label>
-                    <input type="text" className="modern-input" placeholder="e.g. US Voice / Chat" value={formData.process_name} onChange={(e) => setFormData({ ...formData, process_name: e.target.value })} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
-                  </div>
-
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Client POC (Point of Contact)</label>
-                    <input type="text" className="modern-input" placeholder="e.g. Mr. Ramesh" value={formData.client_poc} onChange={(e) => setFormData({ ...formData, client_poc: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Process Name *</label>
+                    <input type="text" className="modern-input" placeholder="e.g. US Voice" value={formData.process_name} onChange={(e) => setFormData({ ...formData, process_name: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
                   </div>
                   
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Internal HR Name *</label>
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Internal HR Name *</label>
                     <select 
                       className="modern-input"
                       value={isOtherSelected ? 'Other' : formData.recruiter} 
@@ -698,13 +688,13 @@ export default function App() {
                         }
                       }} 
                       required={!isOtherSelected}
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '13px' }}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '12px' }}
                     >
-                      <option value="" disabled>-- Select Internal HR --</option>
+                      <option value="" disabled>-- Select HR --</option>
                       {predefinedHRs.map(hr => (
                         <option key={hr} value={hr}>{hr}</option>
                       ))}
-                      <option value="Other">➕ Other (Type new HR)</option>
+                      <option value="Other">➕ Other</option>
                     </select>
 
                     {isOtherSelected && (
@@ -715,55 +705,50 @@ export default function App() {
                         value={otherRecruiterInput} 
                         onChange={(e) => setOtherRecruiterInput(e.target.value)} 
                         required 
-                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #6366f1', boxSizing: 'border-box', marginTop: '8px', fontSize: '13px' }} 
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #6366f1', boxSizing: 'border-box', marginTop: '6px', fontSize: '12px' }} 
                       />
                     )}
                   </div>
 
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Selection Date (Optional)</label>
-                    <input type="date" className="modern-input" value={formData.selection_date} onChange={(e) => setFormData({ ...formData, selection_date: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Joining Date *</label>
+                    <input type="date" className="modern-input" value={formData.joining_date} onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
                   </div>
 
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Joining Date *</label>
-                    <input type="date" className="modern-input" value={formData.joining_date} onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Revenue (INR) *</label>
+                    <input type="number" className="modern-input" placeholder="e.g. 35000" value={formData.revenue} onChange={(e) => setFormData({ ...formData, revenue: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
                   </div>
 
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Revenue (INR) *</label>
-                    <input type="number" className="modern-input" placeholder="e.g. 35000" value={formData.revenue} onChange={(e) => setFormData({ ...formData, revenue: e.target.value })} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
-                  </div>
-
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Candidate Status (Stage)</label>
-                    <select className="modern-input" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px', backgroundColor: '#fff' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Candidate Status</label>
+                    <select className="modern-input" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px', backgroundColor: '#fff' }}>
                       <option value="Yet to Join">Yet to Join</option>
                       <option value="Selected">Selected</option>
                       <option value="Joined">Joined</option>
-                      <option value="Dropped">Dropped (Left before 90 days)</option>
+                      <option value="Dropped">Dropped</option>
                       <option value="Rejected">Rejected</option>
                     </select>
                   </div>
 
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Follow-up Notes / Remarks</label>
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Notes / Remarks</label>
                     <textarea 
                       className="modern-input"
-                      placeholder="e.g. Called on Monday, joining confirmed..." 
+                      placeholder="Remarks..." 
                       value={formData.notes} 
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
                       rows="2"
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', resize: 'vertical', fontSize: '13px' }} 
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', resize: 'vertical', fontSize: '12px' }} 
                     />
                   </div>
 
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button type="submit" style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}>
+                    <button type="submit" style={{ flex: 1, padding: '9px', background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
                       {isEditing ? 'Update Candidate' : 'Save Candidate'}
                     </button>
                     {isEditing && (
-                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '10px 14px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '9px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
                         Cancel
                       </button>
                     )}
@@ -771,120 +756,78 @@ export default function App() {
                 </form>
               </div>
 
-              {/* Table Card */}
-              <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>Candidates Directory ({filteredCandidates.length})</h3>
+              {/* Data Display Section (Table for Desktop, Cards for Mobile) */}
+              <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Directory ({filteredCandidates.length})</h3>
                   
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', width: '100%' }}>
-                    <input type="text" className="modern-input" placeholder="Search name, company, POC..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '130px', fontSize: '12px' }} />
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', width: '100%' }}>
+                    <input type="text" className="modern-input" placeholder="Search name, company..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '120px', fontSize: '11px' }} />
                     
-                    <select className="modern-input" value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: filterHR !== 'All' ? '#e0e7ff' : '#fff', fontWeight: filterHR !== 'All' ? '700' : '500', flex: '1', minWidth: '110px', fontSize: '12px' }}>
+                    <select className="modern-input" value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '95px', fontSize: '11px', backgroundColor: '#fff' }}>
                       <option value="All">All HRs</option>
                       {allRecruiters.map(hr => (
-                        <option key={hr} value={hr}>👤 {hr}</option>
+                        <option key={hr} value={hr}>{hr}</option>
                       ))}
                     </select>
 
-                    <select className="modern-input" value={filterInvoiceStatus} onChange={(e) => setFilterInvoiceStatus(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '130px', fontSize: '12px', backgroundColor: '#fff' }}>
+                    <select className="modern-input" value={filterInvoiceStatus} onChange={(e) => setFilterInvoiceStatus(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '110px', fontSize: '11px', backgroundColor: '#fff' }}>
                       <option value="All">All Invoices</option>
                       <option value="Pending">Pending</option>
-                      <option value="Ready to Invoice">Ready to Invoice</option>
+                      <option value="Ready to Invoice">Ready</option>
                       <option value="Invoice Raised / Pending Clearance">Pending Clearance</option>
                       <option value="Paid">Paid</option>
                     </select>
                   </div>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '700px' }}>
+                {/* DESKTOP TABLE VIEW */}
+                <div className="desktop-table-view" style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '650px' }}>
                     <thead>
                       <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569', fontWeight: '700' }}>
-                        <th style={{ padding: '10px 12px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Candidate Name</th>
-                        <th style={{ padding: '10px 12px' }}>Client & Process</th>
-                        <th style={{ padding: '10px 12px' }}>Joining Date</th>
-                        <th style={{ padding: '10px 12px' }}>Revenue</th>
-                        <th style={{ padding: '10px 12px' }}>Stage</th>
-                        <th style={{ padding: '10px 12px' }}>Invoice Status & No.</th>
-                        <th style={{ padding: '10px 12px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Actions</th>
+                        <th style={{ padding: '9px 10px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Candidate</th>
+                        <th style={{ padding: '9px 10px' }}>Company & Process</th>
+                        <th style={{ padding: '9px 10px' }}>Joining</th>
+                        <th style={{ padding: '9px 10px' }}>Revenue</th>
+                        <th style={{ padding: '9px 10px' }}>Stage</th>
+                        <th style={{ padding: '9px 10px' }}>Invoice Status</th>
+                        <th style={{ padding: '9px 10px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredCandidates.map((item) => {
                         const rev = parseFloat(item.revenue || 0);
-                        
                         return (
                           <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9', opacity: (item.status === 'Dropped' || item.status === 'Rejected') ? 0.6 : 1 }}>
-                            <td style={{ padding: '12px' }}>
-                              <div 
-                                onClick={() => setSelectedCandidate(item)} 
-                                style={{ fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}
-                                title="Click to view details"
-                              >
-                                {item.name}
-                              </div>
-                              <div style={{ fontSize: '11px', color: '#64748b' }}>📞 {item.phone || 'N/A'}</div>
+                            <td style={{ padding: '10px' }}>
+                              <div onClick={() => setSelectedCandidate(item)} style={{ fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}>{item.name}</div>
+                              <div style={{ fontSize: '10px', color: '#64748b' }}>📞 {item.phone || 'N/A'}</div>
                             </td>
-                            <td style={{ padding: '12px' }}>
+                            <td style={{ padding: '10px' }}>
                               <div style={{ fontWeight: '700', color: '#1e293b' }}>🏢 {item.company_name || 'N/A'}</div>
-                              <div style={{ fontSize: '11px', color: '#475569' }}>Proc: {item.process_name || 'N/A'} • HR: {item.recruiter}</div>
+                              <div style={{ fontSize: '10px', color: '#475569' }}>Proc: {item.process_name || 'N/A'} • HR: {item.recruiter}</div>
                             </td>
-                            <td style={{ padding: '12px', fontSize: '11px', color: '#475569' }}>
-                              <div>{item.joining_date}</div>
-                            </td>
-                            <td style={{ padding: '12px' }}>
-                              <div style={{ fontWeight: '700', color: '#0f172a' }}>Rs. {rev.toLocaleString('en-IN')}</div>
-                            </td>
-                            <td style={{ padding: '12px' }}>
-                              <span style={{ 
-                                padding: '4px 10px', 
-                                borderRadius: '20px', 
-                                fontSize: '11px', 
-                                fontWeight: '700', 
-                                display: 'inline-block',
-                                background: item.status === 'Joined' ? '#d1fae5' : '#fef3c7',
-                                color: item.status === 'Joined' ? '#065f46' : '#b45309'
-                              }}>
-                                {item.status || 'Yet to Join'}
+                            <td style={{ padding: '10px', fontSize: '11px', color: '#475569' }}>{item.joining_date}</td>
+                            <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>Rs. {rev.toLocaleString('en-IN')}</td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', background: item.status === 'Joined' ? '#d1fae5' : '#fef3c7', color: item.status === 'Joined' ? '#065f46' : '#b45309' }}>
+                                {item.status}
                               </span>
                             </td>
-                            <td style={{ padding: '12px' }}>
-                              <div>
-                                <span style={{ 
-                                  padding: '4px 10px', 
-                                  borderRadius: '20px', 
-                                  fontSize: '11px', 
-                                  fontWeight: '700', 
-                                  display: 'inline-block',
-                                  background: 
-                                    item.invoice_status === 'Paid' ? '#d1fae5' : 
-                                    item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : 
-                                    item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#fee2e2' : '#f1f5f9',
-                                  color: 
-                                    item.invoice_status === 'Paid' ? '#065f46' : 
-                                    item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#991b1b' : '#334155'
-                                }}>
-                                  {item.invoice_status}
-                                </span>
-                              </div>
-                              {item.invoice_number && (
-                                <div style={{ fontSize: '10px', color: '#4f46e5', marginTop: '4px', fontWeight: '700' }}>
-                                  Inv#: {item.invoice_number}
-                                </div>
-                              )}
-                              {item.invoice_status === 'Paid' && (
-                                <div style={{ fontSize: '10px', color: '#059669', marginTop: '2px', fontWeight: '600' }}>
-                                  {item.payment_mode} ({item.payment_date})
-                                </div>
-                              )}
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', background: item.invoice_status === 'Paid' ? '#d1fae5' : item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#fee2e2' : '#f1f5f9', color: item.invoice_status === 'Paid' ? '#065f46' : item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#991b1b' : '#334155' }}>
+                                {item.invoice_status}
+                              </span>
+                              {item.invoice_number && <div style={{ fontSize: '9px', color: '#4f46e5', marginTop: '2px', fontWeight: '700' }}>Inv#: {item.invoice_number}</div>}
                             </td>
-                            <td style={{ padding: '12px' }}>
-                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            <td style={{ padding: '10px' }}>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                 {(item.invoice_status === 'Ready to Invoice' || item.invoice_status === 'Invoice Raised / Pending Clearance') && (
-                                  <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Mark Paid</button>
+                                  <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Paid</button>
                                 )}
-                                <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); setIsOtherSelected(false); }} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Edit</button>
-                                <button onClick={() => handleDeleteCandidate(item.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Del</button>
+                                <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); setIsOtherSelected(false); }} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Edit</button>
+                                <button onClick={() => handleDeleteCandidate(item.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Del</button>
                               </div>
                             </td>
                           </tr>
@@ -893,29 +836,75 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* MOBILE CARD VIEW (Optimized for Small Screens) */}
+                <div className="mobile-card-view">
+                  {filteredCandidates.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '20px' }}>No candidates found.</p>
+                  ) : (
+                    filteredCandidates.map((item) => {
+                      const rev = parseFloat(item.revenue || 0);
+                      return (
+                        <div key={item.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', marginBottom: '10px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                            <div>
+                              <div onClick={() => setSelectedCandidate(item)} style={{ fontWeight: '800', color: '#4f46e5', fontSize: '13px', cursor: 'pointer' }}>{item.name}</div>
+                              <div style={{ fontSize: '11px', color: '#1e293b', fontWeight: '600' }}>🏢 {item.company_name} ({item.process_name})</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '12px' }}>Rs. {rev.toLocaleString('en-IN')}</div>
+                              <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', background: item.status === 'Joined' ? '#d1fae5' : '#fef3c7', color: item.status === 'Joined' ? '#065f46' : '#b45309' }}>
+                                {item.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>HR: <strong>{item.recruiter}</strong></span>
+                            <span>Joining: {item.joining_date}</span>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '6px', background: item.invoice_status === 'Paid' ? '#d1fae5' : '#fee2e2', color: item.invoice_status === 'Paid' ? '#065f46' : '#991b1b' }}>
+                              {item.invoice_status} {item.invoice_number ? `(#${item.invoice_number})` : ''}
+                            </span>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                              {(item.invoice_status === 'Ready to Invoice' || item.invoice_status === 'Invoice Raised / Pending Clearance') && (
+                                <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Paid</button>
+                              )}
+                              <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); setIsOtherSelected(false); }} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Edit</button>
+                              <button onClick={() => handleDeleteCandidate(item.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Del</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
               </div>
 
             </div>
           </>
         )}
 
-        {/* Batch / Group Invoice Number Assignment Modal */}
+        {/* Batch / Group Invoice Modal */}
         {showInvoiceModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '16px' }}>
-            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '500px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', fontSize: '18px', fontWeight: '800' }}>Create Group Invoice Number</h3>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '450px' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', fontSize: '16px', fontWeight: '800' }}>Create Group Invoice Number</h3>
               <form onSubmit={handleBatchInvoiceSubmit}>
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Invoice Number (e.g. JG/2026/045) *</label>
-                  <input type="text" className="modern-input" placeholder="Enter custom invoice number..." value={batchInvoiceNumber} onChange={(e) => setBatchInvoiceNumber(e.target.value)} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Invoice Number *</label>
+                  <input type="text" className="modern-input" placeholder="e.g. JG/2026/045" value={batchInvoiceNumber} onChange={(e) => setBatchInvoiceNumber(e.target.value)} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
                 </div>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '6px' }}>Select Candidates for this Invoice (Ready to Invoice):</label>
-                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px', marginBottom: '16px', background: '#f8fafc' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '5px' }}>Select Candidates (Ready to Invoice):</label>
+                <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', marginBottom: '14px', background: '#f8fafc' }}>
                   {readyToInvoiceList.length === 0 ? (
-                    <p style={{ fontSize: '12px', color: '#64748b' }}>No candidates ready to invoice right now.</p>
+                    <p style={{ fontSize: '11px', color: '#64748b' }}>No candidates ready to invoice.</p>
                   ) : (
                     readyToInvoiceList.map(cand => (
-                      <label key={cand.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '12px', cursor: 'pointer' }}>
+                      <label key={cand.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '11px', cursor: 'pointer' }}>
                         <input 
                           type="checkbox" 
                           checked={selectedForBatchInvoice.includes(cand.id)}
@@ -927,16 +916,16 @@ export default function App() {
                             }
                           }}
                         />
-                        <strong style={{ color: '#1e293b' }}>{cand.name}</strong> ({cand.company_name}) - Rs. {parseFloat(cand.revenue || 0).toLocaleString('en-IN')}
+                        <strong>{cand.name}</strong> ({cand.company_name}) - Rs. {parseFloat(cand.revenue || 0).toLocaleString('en-IN')}
                       </label>
                     ))
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button type="submit" style={{ flex: 1, padding: '11px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
-                    Assign Invoice Number & Move to Pending Clearance
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 1, padding: '10px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                    Generate & Move to Pending
                   </button>
-                  <button type="button" onClick={() => setShowInvoiceModal(false)} style={{ padding: '11px 16px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+                  <button type="button" onClick={() => setShowInvoiceModal(false)} style={{ padding: '10px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
                     Cancel
                   </button>
                 </div>
@@ -947,18 +936,18 @@ export default function App() {
 
         {/* Mark as Paid Modal */}
         {paymentModalCandidate && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '16px' }}>
-            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', fontSize: '18px', fontWeight: '800' }}>Confirm Payment Received</h3>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '380px' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', fontSize: '16px', fontWeight: '800' }}>Confirm Payment</h3>
               <form onSubmit={handleMarkAsPaidSubmit}>
-                <p style={{ fontSize: '13px', color: '#475569', marginBottom: '16px' }}>Candidate: <strong style={{ color: '#0f172a' }}>{paymentModalCandidate.name}</strong> ({paymentModalCandidate.company_name})</p>
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Payment Date *</label>
-                  <input type="date" className="modern-input" value={paymentDateInput} onChange={(e) => setPaymentDateInput(e.target.value)} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px' }} />
+                <p style={{ fontSize: '12px', color: '#475569', marginBottom: '14px' }}>Candidate: <strong style={{ color: '#0f172a' }}>{paymentModalCandidate.name}</strong></p>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Payment Date *</label>
+                  <input type="date" className="modern-input" value={paymentDateInput} onChange={(e) => setPaymentDateInput(e.target.value)} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
                 </div>
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Payment Mode *</label>
-                  <select className="modern-input" value={paymentModeInput} onChange={(e) => setPaymentModeInput(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '13px', backgroundColor: '#fff' }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Payment Mode *</label>
+                  <select className="modern-input" value={paymentModeInput} onChange={(e) => setPaymentModeInput(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff', boxSizing: 'border-box' }}>
                     <option value="NEFT">NEFT</option>
                     <option value="UPI">UPI</option>
                     <option value="Cheque">Cheque</option>
@@ -966,11 +955,11 @@ export default function App() {
                     <option value="Bank Transfer">Bank Transfer</option>
                   </select>
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button type="submit" style={{ flex: 1, padding: '11px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
-                    Mark as Paid (Clear Invoice)
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                    Mark as Paid
                   </button>
-                  <button type="button" onClick={() => setPaymentModalCandidate(null)} style={{ padding: '11px 16px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
+                  <button type="button" onClick={() => setPaymentModalCandidate(null)} style={{ padding: '10px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
                     Cancel
                   </button>
                 </div>
@@ -979,32 +968,31 @@ export default function App() {
           </div>
         )}
 
-        {/* Candidate Detail View Modal */}
+        {/* Candidate Detail Modal */}
         {selectedCandidate && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '16px' }}>
-            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '400px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', fontSize: '18px', fontWeight: '800' }}>Candidate Profile</h3>
-              <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#334155' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '380px' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', fontSize: '16px', fontWeight: '800' }}>Candidate Profile</h3>
+              <div style={{ fontSize: '12px', lineHeight: '1.6', color: '#334155' }}>
                 <p><strong>Name:</strong> {selectedCandidate.name}</p>
-                <p><strong>Email:</strong> {selectedCandidate.email || 'N/A'}</p>
                 <p><strong>Phone:</strong> {selectedCandidate.phone || 'N/A'}</p>
-                <p><strong>Client Company:</strong> {selectedCandidate.company_name || 'N/A'}</p>
+                <p><strong>Company:</strong> {selectedCandidate.company_name || 'N/A'}</p>
                 <p><strong>Process:</strong> {selectedCandidate.process_name || 'N/A'}</p>
-                <p><strong>Client POC:</strong> {selectedCandidate.client_poc || 'N/A'}</p>
                 <p><strong>Internal HR:</strong> {selectedCandidate.recruiter || 'N/A'}</p>
                 <p><strong>Joining Date:</strong> {selectedCandidate.joining_date || 'N/A'}</p>
                 <p><strong>Revenue:</strong> Rs. {parseFloat(selectedCandidate.revenue || 0).toLocaleString('en-IN')}</p>
                 <p><strong>Status:</strong> {selectedCandidate.status}</p>
                 <p><strong>Invoice Status:</strong> {selectedCandidate.invoice_status}</p>
                 {selectedCandidate.invoice_number && <p><strong>Invoice Number:</strong> {selectedCandidate.invoice_number}</p>}
-                {selectedCandidate.notes && <p><strong>Notes/Remarks:</strong> {selectedCandidate.notes}</p>}
+                {selectedCandidate.notes && <p><strong>Notes:</strong> {selectedCandidate.notes}</p>}
               </div>
-              <button onClick={() => setSelectedCandidate(null)} style={{ marginTop: '20px', width: '100%', padding: '11px', background: '#475569', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
-                Close Profile
+              <button onClick={() => setSelectedCandidate(null)} style={{ marginTop: '16px', width: '100%', padding: '10px', background: '#475569', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                Close
               </button>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
