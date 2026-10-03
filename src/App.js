@@ -53,7 +53,7 @@ export default function App() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterInvoiceStatus, setFilterInvoiceStatus] = useState('All');
-  const [filterStage, setFilterStage] = useState('All');
+  const [filterStage, setFilterStage] = useState('All'); // Status Filter State
   const [filterHR, setFilterHR] = useState('All');
   const [activeTab, setActiveTab] = useState('dashboard');
   
@@ -733,7 +733,7 @@ export default function App() {
                                   style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}
                                   title={`Send performance report to ${hrName}`}
                                 >
-                                  ✉️ Email Report to {hrName}
+                                  ✉️️ Email Report to {hrName}
                                 </button>
                               ) : (
                                 <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', marginTop: '6px' }}>Email not configured</span>
@@ -898,16 +898,26 @@ export default function App() {
                   <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>Directory ({filteredCandidates.length})</h3>
                   
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', width: '100%' }}>
-                    <input type="text" className="modern-input" placeholder="Search name, company..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '120px', fontSize: '11px' }} />
+                    <input type="text" className="modern-input" placeholder="Search name, company..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '110px', fontSize: '11px' }} />
                     
-                    <select className="modern-input" value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '95px', fontSize: '11px', backgroundColor: '#fff' }}>
+                    <select className="modern-input" value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '85px', fontSize: '11px', backgroundColor: '#fff' }}>
                       <option value="All">All HRs</option>
                       {allRecruiters.map(hr => (
                         <option key={hr} value={hr}>{hr}</option>
                       ))}
                     </select>
 
-                    <select className="modern-input" value={filterInvoiceStatus} onChange={(e) => setFilterInvoiceStatus(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '110px', fontSize: '11px', backgroundColor: '#fff' }}>
+                    {/* All Status Filter Dropdown */}
+                    <select className="modern-input" value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '95px', fontSize: '11px', backgroundColor: '#fff' }}>
+                      <option value="All">All Status</option>
+                      <option value="Yet to Join">Yet to Join</option>
+                      <option value="Selected">Selected</option>
+                      <option value="Joined">Joined</option>
+                      <option value="Dropped">Dropped</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+
+                    <select className="modern-input" value={filterInvoiceStatus} onChange={(e) => setFilterInvoiceStatus(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '100px', fontSize: '11px', backgroundColor: '#fff' }}>
                       <option value="All">All Invoices</option>
                       <option value="Pending">Pending</option>
                       <option value="Ready to Invoice">Ready</option>
