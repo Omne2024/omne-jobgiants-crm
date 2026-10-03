@@ -271,7 +271,6 @@ export default function App() {
   const sendMonthlyReportEmail = () => {
     const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
     
-    // Calculate summary metrics
     const totalRev = candidates.filter(item => item.status !== 'Dropped' && item.status !== 'Rejected').reduce((acc, curr) => acc + (parseFloat(curr.revenue) || 0), 0);
     const totalJoined = candidates.filter(item => item.status === 'Joined').length;
     const totalDropped = candidates.filter(item => item.status === 'Dropped' || item.status === 'Rejected').length;
@@ -289,13 +288,14 @@ export default function App() {
       emailBody = emailBody + `${idx + 1}. ${c.name} | Company: ${c.company_name || 'N/A'} | HR: ${c.recruiter} | Rev: Rs. ${parseFloat(c.revenue || 0).toLocaleString('en-IN')} | Status: ${c.status} | Invoice: ${c.invoice_status}\n`;
     });
 
-    const recipientTo = 'suraj.jha@jobgiants.in';
-    const recipientCc = 'garimabansal@jobgiants.in';
+    const recipientTo = 'Jobgiants1@gmail.com';
+    const recipientCc = 'suraj.jha@jobgiants.in,garimabansal@jobgiants.in';
     const subject = encodeURIComponent(`Monthly Recruitment Report - ${currentMonthName} [JobGiants CRM]`);
     const body = encodeURIComponent(emailBody);
 
-    const mailtoLink = `mailto:${recipientTo}?cc=${recipientCc}&subject=${subject}&body=${body}`;
-    window.location.href = mailtoLink;
+    // Direct Gmail Web Compose link so it opens Gmail instead of Outlook
+    const gmailWebLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipientTo}&cc=${recipientCc}&su=${subject}&body=${body}`;
+    window.open(gmailWebLink, '_blank');
   };
 
   const generateInvoicePDF = (candidate) => {
@@ -519,9 +519,9 @@ export default function App() {
             <button 
               onClick={sendMonthlyReportEmail} 
               style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)' }}
-              title="Send monthly report to Suraj & Garima"
+              title="Send monthly report via Gmail to Jobgiants1@gmail.com"
             >
-              📧 Send Monthly Report
+              📧 Send Monthly Report (Gmail)
             </button>
 
             <label style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
