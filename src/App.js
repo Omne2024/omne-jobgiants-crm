@@ -7,6 +7,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Job Giants website ka official extracted logo URL
+const COMPANY_LOGO_URL = 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
+
 export default function App() {
   const [session] = useState({ user: { email: 'suraj.jha@jobgiants.in' } });
   const [userRole] = useState('Partner');
@@ -300,7 +303,7 @@ export default function App() {
         transform: 'translate(-50%, -50%)',
         width: '450px',
         height: '450px',
-        backgroundImage: 'url("/logo.jpg")',
+        backgroundImage: `url("${COMPANY_LOGO_URL}")`,
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'center',
         backgroundSize: 'contain',
@@ -309,11 +312,11 @@ export default function App() {
         pointerEvents: 'none'
       }} />
 
-      {/* Main Content Wrapper (relative zIndex taaki watermark ke upar aaye) */}
+      {/* Main Content Wrapper */}
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '15px 25px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <img src="/logo.jpg" alt="Logo" style={{ width: '45px', height: '45px', objectFit: 'contain', borderRadius: '50%' }} />
+            <img src={COMPANY_LOGO_URL} alt="Logo" style={{ width: '45px', height: '45px', objectFit: 'contain', borderRadius: '50%' }} />
             <div>
               <h1 style={{ margin: 0, fontSize: '22px' }}>Omne JobGiants Consultancy Services</h1>
               <span style={{ fontSize: '12px', color: '#6b7280' }}>
