@@ -7,9 +7,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function App() {
-  // Authentication & Role States
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState('Partner'); // 'Partner' or 'HR'
+  const [userRole, setUserRole] = useState('Partner'); 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [selectedRoleType, setSelectedRoleType] = useState('Partner');
@@ -19,6 +18,9 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   
+  // Confirmation Modal State for Add, Edit, Delete
+  const [pendingAction, setPendingAction] = useState(null); // { type: 'ADD' | 'EDIT' | 'DELETE', data: ..., message: '...' }
+
   const [companyLogo, setCompanyLogo] = useState(() => {
     return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
   });
@@ -26,7 +28,6 @@ export default function App() {
   const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey'];
   const predefinedCompanies = ['Transom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
 
-  // HR Email & Password Mapping Database with exact passwords requested
   const hrDatabase = {
     'sanchi.aggarwal@jobgiants.in': { name: 'Sanchi', password: 'Sanwall@2024' },
     'sadaf.kazi@jobgiants.in': { name: 'Sadaf', password: 'Sadkaz@2025' },
@@ -96,7 +97,6 @@ export default function App() {
         alert('Invalid Credentials');
       }
     } else {
-      // HR Login
       const hrRecord = hrDatabase[cleanEmail];
       if (hrRecord && hrRecord.password === loginPassword) {
         setUserRole('HR');
@@ -162,7 +162,8 @@ export default function App() {
     }
   };
 
-  const handleFormSubmit = async (e) => {
+  // Step 1: Trigger Form Confirmation Popup before Add/Edit
+  const handleFormSubmit = (e) => {
     e.preventDefault();
 
     const loggedInHRName = userRole === 'HR' ? hrDatabase[loginEmail.trim().toLowerCase()]?.name : '';
@@ -201,56 +202,86 @@ export default function App() {
       notes: formData.notes || ''
     };
 
-    let response;
-    if (isEditing) {
-      response = await supabase.from('candidates').update(payload).eq('id', currentId);
-    } else {
-      response = await supabase.from('candidates').insert([payload]);
-    }
+    const actionType = isEditing ? 'EDIT' : 'ADD';
+    const message = isEditing 
+      ? `Are you sure you want to update the details for candidate "${formData.name}"?` 
+      : `Are you sure you want to add candidate "${formData.name}"?`;
 
-    if (response && response.error) {
-      console.error("Supabase Save Error:", response.error);
-      alert("Failed to save: " + response.error.message);
-    } else {
-      // If edited by Partner, log audit entry
-      if (userRole === 'Partner' && isEditing) {
-        const nowObj = new Date();
-        const logPayload = {
-          partner_email: loginEmail.trim().toLowerCase(),
-          action_type: 'EDIT',
-          candidate_name: formData.name,
-          candidate_company: formData.company_name || 'N/A',
-          action_timestamp: nowObj.toISOString()
-        };
-        await supabase.from('audit_logs').insert([logPayload]);
-        fetchAuditLogs();
+    setPendingAction({
+      type: actionType,
+      payload: payload,
+      message: message
+    });
+  };
+
+  // Step 2: Execute Database Change after confirmation
+  const executeConfirmedAction = async () => {
+    if (!pendingAction) return;
+    const { type, payload } = pendingAction;
+
+    if (type === 'ADD' || type === 'EDIT') {
+      let response;
+      if (type === 'EDIT' && currentId) {
+        response = await supabase.from('candidates').update(payload).eq('id', currentId);
+      } else {
+        response = await supabase.from('candidates').insert([payload]);
       }
 
-      alert("Candidate successfully saved!");
-      setFormData({ 
-        name: '', 
-        email: '',
-        phone: '',
-        recruiter: userRole === 'HR' ? loggedInHRName : '', 
-        company_name: '', 
-        process_name: '', 
-        client_poc: '',
-        selection_date: '',
-        joining_date: '', 
-        revenue: '', 
-        status: 'Yet to Join', 
-        invoice_status: 'Pending',
-        invoice_number: '',
-        payment_date: '',
-        payment_mode: 'NEFT',
-        notes: ''
-      });
-      setIsOtherSelected(false);
-      setOtherRecruiterInput('');
-      setIsEditing(false);
-      setCurrentId(null);
-      fetchCandidates();
+      if (response && response.error) {
+        console.error("Supabase Save Error:", response.error);
+        alert("Failed to save: " + response.error.message);
+      } else {
+        if (userRole === 'Partner' && type === 'EDIT') {
+          const nowObj = new Date();
+          const logPayload = {
+            partner_email: loginEmail.trim().toLowerCase(),
+            action_type: 'EDIT',
+            candidate_name: payload.name,
+            candidate_company: payload.company_name || 'N/A',
+            action_timestamp: nowObj.toISOString()
+          };
+          await supabase.from('audit_logs').insert([logPayload]);
+          fetchAuditLogs();
+        }
+
+        alert(type === 'EDIT' ? "Candidate successfully updated!" : "Candidate successfully added!");
+        setFormData({ 
+          name: '', email: '', phone: '', recruiter: userRole === 'HR' ? (hrDatabase[loginEmail.trim().toLowerCase()]?.name) : '', 
+          company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', 
+          revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', 
+          payment_date: '', payment_mode: 'NEFT', notes: ''
+        });
+        setIsOtherSelected(false);
+        setOtherRecruiterInput('');
+        setIsEditing(false);
+        setCurrentId(null);
+        fetchCandidates();
+      }
+    } else if (type === 'DELETE') {
+      const candidate = pendingAction.candidate;
+      const { error } = await supabase.from('candidates').delete().eq('id', candidate.id);
+      if (error) {
+        alert("Failed to delete: " + error.message);
+      } else {
+        if (userRole === 'Partner') {
+          const nowObj = new Date();
+          const logPayload = {
+            partner_email: loginEmail.trim().toLowerCase(),
+            action_type: 'DELETE',
+            candidate_name: candidate.name,
+            candidate_company: candidate.company_name || 'N/A',
+            action_timestamp: nowObj.toISOString()
+          };
+          await supabase.from('audit_logs').insert([logPayload]);
+          fetchAuditLogs();
+        }
+
+        alert("Candidate successfully deleted!");
+        fetchCandidates();
+      }
     }
+
+    setPendingAction(null);
   };
 
   const handleMarkAsPaidSubmit = async (e) => {
@@ -305,7 +336,8 @@ export default function App() {
     }
   };
 
-  const handleDeleteCandidate = async (candidate, itemCreationDate) => {
+  // Trigger Confirmation Popup before Delete
+  const handleDeleteCandidate = (candidate, itemCreationDate) => {
     if (userRole === 'HR' && itemCreationDate) {
       const entryDate = new Date(itemCreationDate);
       const today = new Date();
@@ -317,29 +349,11 @@ export default function App() {
       }
     }
 
-    if (window.confirm(`Are you sure you want to delete candidate ${candidate.name}?`)) {
-      const { error } = await supabase.from('candidates').delete().eq('id', candidate.id);
-      if (error) {
-        alert("Failed to delete: " + error.message);
-      } else {
-        // If deleted by Partner, record audit log entry instantly
-        if (userRole === 'Partner') {
-          const nowObj = new Date();
-          const logPayload = {
-            partner_email: loginEmail.trim().toLowerCase(),
-            action_type: 'DELETE',
-            candidate_name: candidate.name,
-            candidate_company: candidate.company_name || 'N/A',
-            action_timestamp: nowObj.toISOString()
-          };
-          
-          await supabase.from('audit_logs').insert([logPayload]);
-          fetchAuditLogs();
-        }
-
-        fetchCandidates();
-      }
-    }
+    setPendingAction({
+      type: 'DELETE',
+      candidate: candidate,
+      message: `Are you sure you want to delete candidate "${candidate.name}"?`
+    });
   };
 
   const handleEditClick = (item) => {
@@ -542,7 +556,6 @@ export default function App() {
     return matchesSearch && matchesStatus && matchesStage && matchesHR;
   });
 
-  // HR specific monthly breakdown computation
   const hrCandidatesList = candidates.filter(item => userRole === 'HR' && item.recruiter === currentLoggedInHRName);
   const hrMonthlyBreakdown = {};
   hrCandidatesList.forEach(item => {
@@ -553,13 +566,7 @@ export default function App() {
 
     if (!hrMonthlyBreakdown[monthKey]) {
       hrMonthlyBreakdown[monthKey] = {
-        total: 0,
-        selected: 0,
-        joined: 0,
-        dropped: 0,
-        rejected: 0,
-        yetToJoin: 0,
-        candidates: []
+        total: 0, selected: 0, joined: 0, dropped: 0, rejected: 0, yetToJoin: 0, candidates: []
       };
     }
 
@@ -581,12 +588,7 @@ export default function App() {
     const monthKey = isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     if (!monthlyData[monthKey]) {
-      monthlyData[monthKey] = {
-        totalRevenue: 0,
-        joinedCount: 0,
-        droppedCount: 0,
-        recruiters: {}
-      };
+      monthlyData[monthKey] = { totalRevenue: 0, joinedCount: 0, droppedCount: 0, recruiters: {} };
     }
 
     const rev = parseFloat(item.revenue) || 0;
@@ -610,7 +612,6 @@ export default function App() {
     }
   });
 
-  // LOGIN SCREEN RENDER
   if (!isLoggedIn) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: 'Inter, sans-serif', padding: '16px' }}>
@@ -682,96 +683,41 @@ export default function App() {
           70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
           100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
         }
-        .animated-container {
-          animation: fadeIn 0.35s ease-out forwards;
-        }
-        .animated-modal {
-          animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        .invoice-alert {
-          animation: pulseGlow 2s infinite;
-        }
-        .glass-card {
-          background: rgba(255, 255, 255, 0.9);
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(226, 232, 240, 0.8);
-        }
-        .modern-input {
-          transition: all 0.2s ease;
-        }
-        .modern-input:focus {
-          border-color: #6366f1 !important;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
-          outline: none;
-        }
-        button {
-          transition: all 0.2s ease;
-        }
-        button:hover {
-          filter: brightness(1.05);
-          transform: translateY(-1px);
-        }
-        button:active {
-          transform: translateY(0);
-        }
-        tr.hover-effect:hover {
-          background-color: #f8fafc !important;
-        }
+        .animated-container { animation: fadeIn 0.35s ease-out forwards; }
+        .animated-modal { animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .invoice-alert { animation: pulseGlow 2s infinite; }
+        .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .modern-input { transition: all 0.2s ease; }
+        .modern-input:focus { border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important; outline: none; }
+        button { transition: all 0.2s ease; }
+        button:hover { filter: brightness(1.05); transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        tr.hover-effect:hover { background-color: #f8fafc !important; }
 
-        .responsive-grid {
-          display: grid;
-          grid-template-columns: 1fr 2.8fr;
-          gap: 20px;
-        }
-        .responsive-stats {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-          margin-bottom: 20px;
-        }
-        .desktop-table-view {
-          display: block;
-        }
-        .mobile-card-view {
-          display: none;
-        }
+        .responsive-grid { display: grid; grid-template-columns: 1fr 2.8fr; gap: 20px; }
+        .responsive-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .desktop-table-view { display: block; }
+        .mobile-card-view { display: none; }
 
         @media (max-width: 900px) {
-          .responsive-grid {
-            grid-template-columns: 1fr !important;
-          }
-          .responsive-stats {
-            grid-template-columns: 1fr !important;
-          }
-          .desktop-table-view {
-            display: none !important;
-          }
-          .mobile-card-view {
-            display: block !important;
-          }
+          .responsive-grid { grid-template-columns: 1fr !important; }
+          .responsive-stats { grid-template-columns: 1fr !important; }
+          .desktop-table-view { display: none !important; }
+          .mobile-card-view { display: block !important; }
         }
       `}</style>
 
       {/* Background Watermark Logo */}
       <div style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '350px',
-        height: '350px',
-        backgroundImage: `url("${companyLogo}")`,
-        backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'center',
-        backgroundSize: 'contain',
-        opacity: 0.03,
-        zIndex: 0,
-        pointerEvents: 'none'
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+        width: '350px', height: '350px', backgroundImage: `url("${companyLogo}")`,
+        backgroundRepeat: 'no-repeat', backgroundPosition: 'center', backgroundSize: 'contain',
+        opacity: 0.03, zIndex: 0, pointerEvents: 'none'
       }} />
 
       <div className="animated-container" style={{ position: 'relative', zIndex: 1, maxWidth: '1400px', margin: '0 auto' }}>
         
-        {/* Modern Header Navbar */}
+        {/* Navbar */}
         <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', flexWrap: 'wrap', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ padding: '3px', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', borderRadius: '50%', display: 'flex' }}>
@@ -790,44 +736,26 @@ export default function App() {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             {userRole === 'Partner' && (
               <>
-                <div style={{ position: 'relative' }}>
-                  <button 
-                    onClick={() => setFilterInvoiceStatus('Invoice Raised / Pending Clearance')}
-                    style={{ 
-                      background: pendingInvoicesList.length > 0 ? '#ef4444' : '#e2e8f0', 
-                      color: pendingInvoicesList.length > 0 ? '#fff' : '#334155', 
-                      border: 'none', 
-                      padding: '7px 10px', 
-                      borderRadius: '8px', 
-                      fontSize: '11px', 
-                      fontWeight: '700', 
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                    title="Pending Invoices Clearance Alert"
-                  >
-                    🔔 Pending ({pendingInvoicesList.length})
-                  </button>
-                </div>
-
                 <button 
-                  onClick={sendMonthlyReportEmail} 
-                  style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                  onClick={() => setFilterInvoiceStatus('Invoice Raised / Pending Clearance')}
+                  style={{ 
+                    background: pendingInvoicesList.length > 0 ? '#ef4444' : '#e2e8f0', 
+                    color: pendingInvoicesList.length > 0 ? '#fff' : '#334155', 
+                    border: 'none', padding: '7px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                  }}
                 >
+                  🔔 Pending ({pendingInvoicesList.length})
+                </button>
+
+                <button onClick={sendMonthlyReportEmail} style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
                   📧 Report
                 </button>
 
-                <button 
-                  onClick={downloadSampleCSV} 
-                  style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-                  title="Download Sample CSV Template"
-                >
+                <button onClick={downloadSampleCSV} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
                   📥 CSV Template
                 </button>
 
-                <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }} title="Upload Bulk Candidates via CSV">
+                <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }}>
                   📂 Bulk Upload
                   <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
@@ -838,89 +766,38 @@ export default function App() {
                 </label>
 
                 <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px', gap: '2px' }}>
-                  <button 
-                    onClick={() => setActiveTab('dashboard')} 
-                    style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
-                    Dash
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('reports')} 
-                    style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
-                    Reports
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('audit')} 
-                    style={{ padding: '6px 10px', background: activeTab === 'audit' ? '#fff' : 'transparent', color: activeTab === 'audit' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
-                    Audit History
-                  </button>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Dash</button>
+                  <button onClick={() => setActiveTab('reports')} style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Reports</button>
+                  <button onClick={() => setActiveTab('audit')} style={{ padding: '6px 10px', background: activeTab === 'audit' ? '#fff' : 'transparent', color: activeTab === 'audit' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Audit History</button>
                 </div>
               </>
             )}
 
             {userRole === 'HR' && (
               <>
-                <button 
-                  onClick={downloadSampleCSV} 
-                  style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-                  title="Download Sample CSV Template"
-                >
+                <button onClick={downloadSampleCSV} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
                   📥 CSV Template
                 </button>
 
-                <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }} title="Upload Bulk Candidates via CSV">
+                <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }}>
                   📂 Bulk Upload
                   <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
 
                 <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px', gap: '2px' }}>
-                  <button 
-                    onClick={() => setActiveTab('dashboard')} 
-                    style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
-                    Dash
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('reports')} 
-                    style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
-                    Reports
-                  </button>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Dash</button>
+                  <button onClick={() => setActiveTab('reports')} style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Reports</button>
                 </div>
               </>
             )}
 
-            <button 
-              onClick={() => setIsLoggedIn(false)} 
-              style={{ background: '#64748b', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-            >
+            <button onClick={() => setIsLoggedIn(false)} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
               🔒 Logout
             </button>
           </div>
         </div>
 
-        {/* Ready to Invoice Alert Banner (Partner Only) */}
-        {userRole === 'Partner' && readyToInvoiceList.length > 0 && (
-          <div className="invoice-alert" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '1px solid #f59e0b', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px' }}>⚡</span>
-              <span style={{ fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
-                {readyToInvoiceList.length} candidate(s) completed 90 days! Create group invoice number.
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button 
-                onClick={() => setShowInvoiceModal(true)} 
-                style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-                ➕ Create Invoice #
-              </button>
-              <button 
-                onClick={() => setFilterInvoiceStatus('Ready to Invoice')} 
-                style={{ background: '#d97706', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-                Filter Ready
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* AUDIT HISTORY TAB (Partner Only) */}
+        {/* Audit History Tab */}
         {userRole === 'Partner' && activeTab === 'audit' ? (
           <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
             <h2 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>
@@ -984,19 +861,14 @@ export default function App() {
                 >
                   <option value="All">All Months</option>
                   {userRole === 'HR' ? (
-                    Object.keys(hrMonthlyBreakdown).map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))
+                    Object.keys(hrMonthlyBreakdown).map(m => <option key={m} value={m}>{m}</option>)
                   ) : (
-                    Object.keys(monthlyData).map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))
+                    Object.keys(monthlyData).map(m => <option key={m} value={m}>{m}</option>)
                   )}
                 </select>
               </div>
             </div>
 
-            {/* HR Reports View */}
             {userRole === 'HR' ? (
               Object.keys(hrMonthlyBreakdown).length === 0 ? (
                 <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
@@ -1006,7 +878,7 @@ export default function App() {
                   .map((month) => {
                     const mData = hrMonthlyBreakdown[month];
                     return (
-                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                           <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
                           <div style={{ display: 'flex', gap: '8px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
@@ -1050,7 +922,6 @@ export default function App() {
                   })
               )
             ) : (
-              // Partner Reports View
               Object.keys(monthlyData).length === 0 ? (
                 <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
               ) : (
@@ -1062,7 +933,7 @@ export default function App() {
                     const topHRName = sortedHRs[0] || 'N/A';
 
                     return (
-                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                           <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
                           <div style={{ display: 'flex', gap: '10px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
@@ -1094,11 +965,7 @@ export default function App() {
                                 </div>
 
                                 {hasEmailRegistered ? (
-                                  <button 
-                                    onClick={() => sendHRPerformanceEmail(hrName, month, hrStats)}
-                                    style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}
-                                    title={`Send performance report to ${hrName}`}
-                                  >
+                                  <button onClick={() => sendHRPerformanceEmail(hrName, month, hrStats)} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}>
                                     ✉️ Email Report to {hrName}
                                   </button>
                                 ) : (
@@ -1118,13 +985,13 @@ export default function App() {
           <>
             {userRole === 'Partner' && (
               <div className="responsive-stats">
-                <div style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', padding: '16px', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.2)' }}>
+                <div style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', padding: '16px', borderRadius: '16px' }}>
                   <h3 style={{ margin: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
                     {filterHR === 'All' ? 'Active Revenue Pipeline' : `Revenue (${filterHR})`}
                   </h3>
                   <p style={{ margin: '6px 0 0 0', fontSize: '24px', fontWeight: '800' }}>Rs. {totalRevenue.toLocaleString('en-IN')}</p>
                 </div>
-                <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '16px', borderRadius: '16px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.2)' }}>
+                <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '16px', borderRadius: '16px' }}>
                   <h3 style={{ margin: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
                     {filterHR === 'All' ? 'Active Lateral Hirings (≥ 30k)' : `Lateral Hirings (${filterHR})`}
                   </h3>
@@ -1133,28 +1000,14 @@ export default function App() {
               </div>
             )}
 
-            {/* HR Monthly Summary Cards Dashboard */}
             {userRole === 'HR' && (
               <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>📊 Your Monthly Performance Summary</h3>
-                </div>
-
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>📊 Your Monthly Performance Summary</h3>
                 {(() => {
-                  let calcTotal = 0;
-                  let calcSelected = 0;
-                  let calcJoined = 0;
-                  let calcDropped = 0;
-                  let calcRejected = 0;
-
+                  let calcTotal = 0, calcSelected = 0, calcJoined = 0, calcDropped = 0, calcRejected = 0;
                   Object.values(hrMonthlyBreakdown).forEach(val => {
-                    calcTotal += val.total;
-                    calcSelected += val.selected;
-                    calcJoined += val.joined;
-                    calcDropped += val.dropped;
-                    calcRejected += val.rejected;
+                    calcTotal += val.total; calcSelected += val.selected; calcJoined += val.joined; calcDropped += val.dropped; calcRejected += val.rejected;
                   });
-
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
                       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
@@ -1188,7 +1041,7 @@ export default function App() {
               {/* Form Card */}
               <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', height: 'fit-content' }}>
                 <h3 style={{ marginTop: 0, marginBottom: '14px', fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
-                  {userRole === 'HR' ? (isEditing ? '✏️ Edit Entry' : `📝 Daily Entry Form (${currentLoggedInHRName})`) : (isEditing ? '✏️️ Edit Candidate' : '➕ Add Candidate')}
+                  {userRole === 'HR' ? (isEditing ? '✏️ Edit Entry' : `📝 Daily Entry Form (${currentLoggedInHRName})`) : (isEditing ? '✏ Edit Candidate' : '➕ Add Candidate')}
                 </h3>
                 <form onSubmit={handleFormSubmit}>
                   <div style={{ marginBottom: '10px' }}>
@@ -1216,9 +1069,7 @@ export default function App() {
                       style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '12px' }}
                     >
                       <option value="" disabled>-- Select Client Company --</option>
-                      {predefinedCompanies.map(comp => (
-                        <option key={comp} value={comp}>{comp}</option>
-                      ))}
+                      {predefinedCompanies.map(comp => <option key={comp} value={comp}>{comp}</option>)}
                     </select>
                   </div>
 
@@ -1246,20 +1097,14 @@ export default function App() {
                         style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '12px' }}
                       >
                         <option value="" disabled>-- Select HR --</option>
-                        {predefinedHRs.map(hr => (
-                          <option key={hr} value={hr}>{hr}</option>
-                        ))}
+                        {predefinedHRs.map(hr => <option key={hr} value={hr}>{hr}</option>)}
                         <option value="Other">➕ Other</option>
                       </select>
 
                       {isOtherSelected && (
                         <input 
-                          type="text" 
-                          className="modern-input"
-                          placeholder="Enter new HR name..." 
-                          value={otherRecruiterInput} 
-                          onChange={(e) => setOtherRecruiterInput(e.target.value)} 
-                          required 
+                          type="text" className="modern-input" placeholder="Enter new HR name..." 
+                          value={otherRecruiterInput} onChange={(e) => setOtherRecruiterInput(e.target.value)} required 
                           style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #6366f1', boxSizing: 'border-box', marginTop: '6px', fontSize: '12px' }} 
                         />
                       )}
@@ -1297,11 +1142,8 @@ export default function App() {
                   <div style={{ marginBottom: '14px' }}>
                     <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Notes / Remarks</label>
                     <textarea 
-                      className="modern-input"
-                      placeholder="Remarks..." 
-                      value={formData.notes} 
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
-                      rows="2"
+                      className="modern-input" placeholder="Remarks..." value={formData.notes} 
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows="2"
                       style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', resize: 'vertical', fontSize: '12px' }} 
                     />
                   </div>
@@ -1332,9 +1174,7 @@ export default function App() {
                     {userRole === 'Partner' && (
                       <select className="modern-input" value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '85px', fontSize: '11px', backgroundColor: '#fff' }}>
                         <option value="All">All HRs</option>
-                        {allRecruiters.map(hr => (
-                          <option key={hr} value={hr}>{hr}</option>
-                        ))}
+                        {allRecruiters.map(hr => <option key={hr} value={hr}>{hr}</option>)}
                       </select>
                     )}
 
@@ -1478,7 +1318,34 @@ export default function App() {
           </>
         )}
 
-        {/* Batch Invoice Modal (Partner Only) */}
+        {/* Global Confirmation Popup Modal for Add, Edit, Delete */}
+        {pendingAction && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '380px', textAlign: 'center' }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+              <h3 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>Confirm Action</h3>
+              <p style={{ fontSize: '13px', color: '#475569', marginBottom: '20px', lineHeight: '1.5' }}>
+                {pendingAction.message}
+              </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={executeConfirmedAction} 
+                  style={{ flex: 1, padding: '10px', background: pendingAction.type === 'DELETE' ? '#ef4444' : '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Yes, Confirm
+                </button>
+                <button 
+                  onClick={() => setPendingAction(null)} 
+                  style={{ flex: 1, padding: '10px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Batch Invoice Modal */}
         {showInvoiceModal && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
             <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '450px' }}>
@@ -1499,11 +1366,8 @@ export default function App() {
                           type="checkbox" 
                           checked={selectedForBatchInvoice.includes(cand.id)}
                           onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedForBatchInvoice([...selectedForBatchInvoice, cand.id]);
-                            } else {
-                              setSelectedForBatchInvoice(selectedForBatchInvoice.filter(id => id !== cand.id));
-                            }
+                            if (e.target.checked) setSelectedForBatchInvoice([...selectedForBatchInvoice, cand.id]);
+                            else setSelectedForBatchInvoice(selectedForBatchInvoice.filter(id => id !== cand.id));
                           }}
                         />
                         <strong>{cand.name}</strong> ({cand.company_name}) - Rs. {parseFloat(cand.revenue || 0).toLocaleString('en-IN')}
@@ -1524,7 +1388,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Mark as Paid Modal (Partner Only) */}
+        {/* Mark as Paid Modal */}
         {paymentModalCandidate && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
             <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '380px' }}>
