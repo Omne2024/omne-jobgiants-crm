@@ -19,14 +19,14 @@ export default function App() {
     return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
   });
   
-  // Pre-defined HRs list + any future HRs added
+  // Pre-defined HRs list
   const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey'];
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    recruiter: 'Sanchi', // Default select
+    recruiter: '', // Default blank rakha hai taaki user dropdown se select kare
     company_name: '',
     process_name: '',
     joining_date: '',
@@ -34,6 +34,10 @@ export default function App() {
     status: 'Yet to Join',
     invoice_status: 'Pending'
   });
+
+  // 'Other' option ke liye alag se state
+  const [otherRecruiterInput, setOtherRecruiterInput] = useState('');
+  const [isOtherSelected, setIsOtherSelected] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterInvoiceStatus, setFilterInvoiceStatus] = useState('All');
@@ -97,6 +101,12 @@ export default function App() {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
+    let finalRecruiter = isOtherSelected ? otherRecruiterInput.trim() : formData.recruiter;
+    if (!finalRecruiter) {
+      alert("Kripya Internal HR ka naam select karein ya enter karein.");
+      return;
+    }
+
     let updatedInvoiceStatus = formData.invoice_status;
     if (formData.status === 'Dropped' || formData.status === 'Rejected') {
       updatedInvoiceStatus = 'Dropped';
@@ -104,7 +114,7 @@ export default function App() {
 
     const payload = {
       ...formData,
-      recruiter: formData.recruiter.trim(),
+      recruiter: finalRecruiter,
       invoice_status: updatedInvoiceStatus
     };
 
@@ -123,7 +133,7 @@ export default function App() {
         name: '', 
         email: '',
         phone: '',
-        recruiter: 'Sanchi', 
+        recruiter: '', 
         company_name: '', 
         process_name: '', 
         joining_date: '', 
@@ -131,6 +141,8 @@ export default function App() {
         status: 'Yet to Join', 
         invoice_status: 'Pending' 
       });
+      setIsOtherSelected(false);
+      setOtherRecruiterInput('');
       setIsEditing(false);
       setCurrentId(null);
       fetchCandidates();
@@ -255,7 +267,6 @@ export default function App() {
     doc.save(`Invoice_${candidate.name.replace(/\s+/g, '_')}.pdf`);
   };
 
-  // Combine pre-defined HRs and any unique HRs found in database or added later
   const allRecruiters = Array.from(new Set([...predefinedHRs, ...candidates.map(item => item.recruiter)])).filter(Boolean);
 
   const totalRevenue = candidates
@@ -501,14 +512,44 @@ export default function App() {
                     <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Process Name *</label>
                     <input type="text" placeholder="e.g. US Voice" value={formData.process_name} onChange={(e) => setFormData({ ...formData, process_name: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
                   </div>
+                  
+                  {/* Internal HR Dropdown with 'Other' option */}
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Internal HR Name *</label>
-                    <select value={formData.recruiter} onChange={(e) => setFormData({ ...formData, recruiter: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box', backgroundColor: '#fff' }}>
-                      {allRecruiters.map(hr => (
+                    <select 
+                      value={isOtherSelected ? 'Other' : formData.recruiter} 
+                      onChange={(e) => {
+                        if (e.target.value === 'Other') {
+                          setIsOtherSelected(true);
+                          setFormData({ ...formData, recruiter: '' });
+                        } else {
+                          setIsOtherSelected(false);
+                          setFormData({ ...formData, recruiter: e.target.value });
+                        }
+                      }} 
+                      required={!isOtherSelected}
+                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box', backgroundColor: '#fff' }}
+                    >
+                      <option value="" disabled>-- Select Internal HR --</option>
+                      {predefinedHRs.map(hr => (
                         <option key={hr} value={hr}>{hr}</option>
                       ))}
+                      <option value="Other">➕ Other (Type new HR)</option>
                     </select>
+
+                    {/* Agar 'Other' select kiya ho toh naya input box dikhega */}
+                    {isOtherSelected && (
+                      <input 
+                        type="text" 
+                        placeholder="Enter new HR name..." 
+                        value={otherRecruiterInput} 
+                        onChange={(e) => setOtherRecruiterInput(e.target.value)} 
+                        required 
+                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #0284c7', boxSizing: 'border-box', marginTop: '8px' }} 
+                      />
+                    )}
                   </div>
+
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Joining Date *</label>
                     <input type="date" value={formData.joining_date} onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })} required style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }} />
@@ -532,7 +573,7 @@ export default function App() {
                       {isEditing ? 'Update Details' : 'Save Candidate'}
                     </button>
                     {isEditing && (
-                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setFormData({ name: '', email: '', phone: '', recruiter: 'Sanchi', company_name: '', process_name: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending' }); }} style={{ padding: '10px', backgroundColor: '#6b7280', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending' }); }} style={{ padding: '10px', backgroundColor: '#6b7280', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                         Cancel
                       </button>
                     )}
@@ -645,7 +686,7 @@ export default function App() {
                                 {item.invoice_status === 'Ready to Invoice' && (
                                   <button onClick={() => generateInvoicePDF(item)} style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>PDF</button>
                                 )}
-                                <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); }} style={{ backgroundColor: '#4b5563', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>Edit</button>
+                                <button onClick={() => { setIsEditing(true); setCurrentId(item.id); setFormData(item); setIsOtherSelected(false); }} style={{ backgroundColor: '#4b5563', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>Edit</button>
                                 <button onClick={() => handleDeleteCandidate(item.id)} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>Del</button>
                               </div>
                             </td>
@@ -662,7 +703,7 @@ export default function App() {
 
         {selectedCandidate && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-            <div className="animated-modal" style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', width: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'}}>
+            <div className="animated-modal" style={{ backgroundColor: '#fff', padding: '25px', borderRadius: '8px', width: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
               <h3 style={{ marginTop: 0, color: '#1f2937', borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}>Candidate Details</h3>
               <div style={{ fontSize: '14px', lineHeight: '1.6', color: '#374151' }}>
                 <p><strong>Name:</strong> {selectedCandidate.name}</p>
