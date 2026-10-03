@@ -7,9 +7,6 @@ const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Job Giants website ka official extracted logo URL
-const COMPANY_LOGO_URL = 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
-
 export default function App() {
   const [session] = useState({ user: { email: 'suraj.jha@jobgiants.in' } });
   const [userRole] = useState('Partner');
@@ -17,6 +14,11 @@ export default function App() {
   const [candidates, setCandidates] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
+  
+  // CRM ke andar se Logo manage karne ke liye state (localStorage support ke sath)
+  const [companyLogo, setCompanyLogo] = useState(() => {
+    return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
+  });
   
   const [formData, setFormData] = useState({
     name: '',
@@ -41,6 +43,21 @@ export default function App() {
   useEffect(() => {
     fetchCandidates();
   }, []);
+
+  // CRM ke andar se direct logo upload karke save karne ka function
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Image = event.target.result;
+      setCompanyLogo(base64Image);
+      localStorage.setItem('crm_custom_logo', base64Image);
+      alert("Logo successfully update ho gaya hai!");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const fetchCandidates = async () => {
     let query = supabase.from('candidates').select('*');
@@ -303,7 +320,7 @@ export default function App() {
         transform: 'translate(-50%, -50%)',
         width: '450px',
         height: '450px',
-        backgroundImage: `url("${COMPANY_LOGO_URL}")`,
+        backgroundImage: `url("${companyLogo}")`,
         backgroundRepeat: 'no-repeat',
         backgroundPosition: 'center',
         backgroundSize: 'contain',
@@ -316,7 +333,7 @@ export default function App() {
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '15px 25px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <img src={COMPANY_LOGO_URL} alt="Logo" style={{ width: '45px', height: '45px', objectFit: 'contain', borderRadius: '50%' }} />
+            <img src={companyLogo} alt="Logo" style={{ width: '45px', height: '45px', objectFit: 'contain', borderRadius: '50%', backgroundColor: '#f3f4f6' }} />
             <div>
               <h1 style={{ margin: 0, fontSize: '22px' }}>Omne JobGiants Consultancy Services</h1>
               <span style={{ fontSize: '12px', color: '#6b7280' }}>
@@ -325,6 +342,13 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            
+            {/* CRM ke andar se Logo Change karne ka Button */}
+            <label style={{ backgroundColor: '#7c3aed', color: '#fff', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+              🖼️ Upload/Change Logo
+              <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+            </label>
+
             <button 
               onClick={downloadSampleCSV} 
               style={{ backgroundColor: '#4b5563', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
