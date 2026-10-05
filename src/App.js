@@ -25,13 +25,14 @@ export default function App() {
     return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
   });
   
-  const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey'];
+  const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey', 'Juveria'];
   const predefinedCompanies = ['Transom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
 
   const hrDatabase = {
     'sanchi.aggarwal@jobgiants.in': { name: 'Sanchi', password: 'Sanwall@2024' },
     'sadaf.kazi@jobgiants.in': { name: 'Sadaf', password: 'Sadkaz@2025' },
-    'anjali.srivastava@jobgiants.in': { name: 'Anjali', password: 'Anjsri@2026' }
+    'anjali.srivastava@jobgiants.in': { name: 'Anjali', password: 'Anjsri@2026' },
+    'juveria.hashmi@jobgiants.in': { name: 'Juveria', password: 'Juvhas@2026' }
   };
 
   const partnerEmails = ['suraj.jha@jobgiants.in', 'garimabansal@jobgiants.in'];
@@ -481,7 +482,8 @@ export default function App() {
   const hrEmailDirectory = {
     'Sanchi': 'sanchi.aggarwal@jobgiants.in',
     'Sadaf': 'sadaf.kazi@jobgiants.in',
-    'Anjali': 'anjali.srivastava@jobgiants.in'
+    'Anjali': 'anjali.srivastava@jobgiants.in',
+    'Juveria': 'juveria.hashmi@jobgiants.in'
   };
 
   const sendHRPerformanceEmail = (hrName, monthKey, hrData) => {
