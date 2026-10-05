@@ -833,7 +833,7 @@ export default function App() {
                         onClick={sendMonthlyReportEmail}
                         style={{ padding: '8px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                       >
-                        📧 Send Overall Report (Gmail)
+                        📧 Send Overall Report to Management (Gmail)
                       </button>
                     </div>
                   </div>
