@@ -81,6 +81,9 @@ export default function App() {
   const ITEMS_PER_PAGE = 15;
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Month filter for Active Revenue Pipeline card
+  const [selectedRevenueMonth, setSelectedRevenueMonth] = useState('All');
+
   useEffect(() => {
     if (isLoggedIn) {
       fetchCandidates();
@@ -93,6 +96,12 @@ export default function App() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterInvoiceStatus, filterStage, filterHR]);
+
+  useEffect(() => {
+    if (isLoggedIn && userRole === 'Partner' && activeTab === 'audit') {
+      fetchAuditLogs();
+    }
+  }, [activeTab]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -166,6 +175,9 @@ export default function App() {
 
   const fetchAuditLogs = async () => {
     const { data, error } = await supabase.from('audit_logs').select('*').order('action_timestamp', { ascending: false });
+    if (error) {
+      console.error("Audit Fetch Error:", error);
+    }
     if (!error && data) {
       setAuditLogs(data);
     }
@@ -249,7 +261,11 @@ export default function App() {
             candidate_company: payload.company_name || 'N/A',
             action_timestamp: nowObj.toISOString()
           };
-          await supabase.from('audit_logs').insert([logPayload]);
+          const { error: auditError } = await supabase.from('audit_logs').insert([logPayload]);
+          if (auditError) {
+            console.error("Audit Log Error:", auditError);
+            alert("Action completed, but audit log could not be saved: " + auditError.message);
+          }
           fetchAuditLogs();
         }
 
@@ -281,7 +297,11 @@ export default function App() {
             candidate_company: candidate.company_name || 'N/A',
             action_timestamp: nowObj.toISOString()
           };
-          await supabase.from('audit_logs').insert([logPayload]);
+          const { error: auditError } = await supabase.from('audit_logs').insert([logPayload]);
+          if (auditError) {
+            console.error("Audit Log Error:", auditError);
+            alert("Action completed, but audit log could not be saved: " + auditError.message);
+          }
           fetchAuditLogs();
         }
 
@@ -538,8 +558,27 @@ export default function App() {
   const readyToInvoiceList = candidates.filter(item => item.invoice_status === 'Ready to Invoice');
   const pendingInvoicesList = candidates.filter(item => item.invoice_status === 'Invoice Raised / Pending Clearance');
 
+  const getRevenueMonthKey = (item) => {
+    const dateToUse = item.joining_date || item.selection_date;
+    if (!dateToUse) return null;
+    const dateObj = new Date(dateToUse);
+    return isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
+  const revenueMonthOptions = Array.from(
+    candidates.reduce((map, item) => {
+      const key = getRevenueMonthKey(item);
+      if (key && !map.has(key)) {
+        const dateObj = new Date(item.joining_date || item.selection_date);
+        map.set(key, isNaN(dateObj) ? 0 : dateObj.getFullYear() * 12 + dateObj.getMonth());
+      }
+      return map;
+    }, new Map())
+  ).sort((a, b) => b[1] - a[1]).map(entry => entry[0]);
+
   const totalRevenue = candidates
     .filter(item => (filterHR === 'All' || item.recruiter === filterHR))
+    .filter(item => selectedRevenueMonth === 'All' || getRevenueMonthKey(item) === selectedRevenueMonth)
     .filter(item => item.status !== 'Dropped' && item.status !== 'Rejected')
     .reduce((acc, curr) => acc + (parseFloat(curr.revenue) || 0), 0);
   
@@ -1003,6 +1042,14 @@ export default function App() {
                   <h3 style={{ margin: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
                     {filterHR === 'All' ? 'Active Revenue Pipeline' : `Revenue (${filterHR})`}
                   </h3>
+                  <select
+                    value={selectedRevenueMonth}
+                    onChange={(e) => setSelectedRevenueMonth(e.target.value)}
+                    style={{ marginTop: '6px', padding: '3px 6px', borderRadius: '6px', border: 'none', fontSize: '10px', fontWeight: '700', color: '#065f46', backgroundColor: 'rgba(255,255,255,0.9)', cursor: 'pointer' }}
+                  >
+                    <option value="All">All Months</option>
+                    {revenueMonthOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
                   <p style={{ margin: '6px 0 0 0', fontSize: '24px', fontWeight: '800' }}>Rs. {totalRevenue.toLocaleString('en-IN')}</p>
                 </div>
                 <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '16px', borderRadius: '16px' }}>
