@@ -1004,7 +1004,7 @@ export default function App() {
 
             {userRole === 'HR' && (
               <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>📊 Your Monthly Performance Summary</h3>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>📊 Your Performance Summary</h3>
                 {(() => {
                   let calcTotal = 0, calcSelected = 0, calcJoined = 0, calcDropped = 0, calcRejected = 0;
                   Object.values(hrMonthlyBreakdown).forEach(val => {
