@@ -19,7 +19,7 @@ export default function App() {
   const [currentId, setCurrentId] = useState(null);
   
   // Confirmation Modal State for Add, Edit, Delete
-  const [pendingAction, setPendingAction] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null); // { type: 'ADD' | 'EDIT' | 'DELETE', data: ..., message: '...' }
 
   const [companyLogo, setCompanyLogo] = useState(() => {
     return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
@@ -142,7 +142,7 @@ export default function App() {
         let currentInvoiceStatus = item.invoice_status;
         if (item.status === 'Dropped' || item.status === 'Rejected') {
           currentInvoiceStatus = 'Cancelled';
-        } else if (diffDays >= 91 && currentInvoiceStatus === 'Pending') {
+        } else if (diffDays > 90 && currentInvoiceStatus === 'Pending') {
           currentInvoiceStatus = 'Ready to Invoice';
         }
 
@@ -162,6 +162,7 @@ export default function App() {
     }
   };
 
+  // Step 1: Trigger Form Confirmation Popup before Add/Edit
   const handleFormSubmit = (e) => {
     e.preventDefault();
 
@@ -213,6 +214,7 @@ export default function App() {
     });
   };
 
+  // Step 2: Execute Database Change after confirmation
   const executeConfirmedAction = async () => {
     if (!pendingAction) return;
     const { type, payload } = pendingAction;
@@ -334,6 +336,7 @@ export default function App() {
     }
   };
 
+  // Trigger Confirmation Popup before Delete
   const handleDeleteCandidate = (candidate, itemCreationDate) => {
     if (userRole === 'HR' && itemCreationDate) {
       const entryDate = new Date(itemCreationDate);
@@ -375,7 +378,7 @@ export default function App() {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
       + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
-      + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,,25000,Dropped,Candidate backed out";
+      + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -414,6 +417,7 @@ export default function App() {
         const invStatus = (statusVal === 'Dropped' || statusVal === 'Rejected') ? 'Cancelled' : 'Pending';
         const rowRecruiter = userRole === 'HR' ? loggedInHRName : (obj.recruiter ? obj.recruiter.trim() : 'Sanchi');
 
+        // Safely handle optional dates
         const cleanSelDate = obj.selection_date && obj.selection_date.trim() !== '' ? obj.selection_date : null;
         const cleanJoinDate = obj.joining_date && obj.joining_date.trim() !== '' ? obj.joining_date : null;
 
@@ -492,12 +496,11 @@ export default function App() {
     }
 
     const hrCandidates = candidates.filter(item => {
-      if (item.recruiter?.trim() !== hrName) return false;
       const dateToUse = item.joining_date || item.selection_date;
-      if (!dateToUse) return monthKey === 'Without Date / General';
+      if (!dateToUse) return false;
       const dateObj = new Date(dateToUse);
-      const mKey = isNaN(dateObj) ? 'Without Date / General' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-      return mKey === monthKey;
+      const mKey = isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+      return item.recruiter?.trim() === hrName && mKey === monthKey;
     });
 
     let emailBody = `Hi ${hrName},\n\n`;
@@ -526,6 +529,8 @@ export default function App() {
   };
 
   const allRecruiters = Array.from(new Set([...predefinedHRs, ...candidates.map(item => item.recruiter)])).filter(Boolean);
+  const readyToInvoiceList = candidates.filter(item => item.invoice_status === 'Ready to Invoice');
+  const pendingInvoicesList = candidates.filter(item => item.invoice_status === 'Invoice Raised / Pending Clearance');
 
   const totalRevenue = candidates
     .filter(item => (filterHR === 'All' || item.recruiter === filterHR))
@@ -538,10 +543,6 @@ export default function App() {
 
   const currentLoggedInHRName = userRole === 'HR' ? hrDatabase[loginEmail.trim().toLowerCase()]?.name : '';
 
-  const missingJoiningDateCandidates = candidates.filter(item => 
-    userRole === 'HR' && item.recruiter === currentLoggedInHRName && item.selection_date && !item.joining_date && item.status !== 'Dropped' && item.status !== 'Rejected'
-  );
-
   const filteredCandidates = candidates.filter((item) => {
     const matchesSearch = 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||  
@@ -551,7 +552,7 @@ export default function App() {
       (item.client_poc && item.client_poc.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.phone && item.phone.includes(searchTerm)) ||
-      (item.notes && item.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+      (item.notes && item.notes.toLowerCase().includes(searchTerm.toLowerCase())); // Search remarks/notes
     
     const matchesStatus = filterInvoiceStatus === 'All' || item.invoice_status === filterInvoiceStatus;
     const matchesStage = filterStage === 'All' || item.status === filterStage;
@@ -562,16 +563,14 @@ export default function App() {
 
   const hrCandidatesList = candidates.filter(item => userRole === 'HR' && item.recruiter === currentLoggedInHRName);
   
-  // Fixed HR Monthly Breakdown to handle missing/null dates gracefully without skipping dropped candidates
+  // Fixed hrMonthlyBreakdown so missing dates (Dropped candidates) are not skipped
   const hrMonthlyBreakdown = {};
   hrCandidatesList.forEach(item => {
     const dateToUse = item.joining_date || item.selection_date;
-    let monthKey = 'Without Date / General';
+    let monthKey = 'General / No Date';
     if (dateToUse) {
       const dateObj = new Date(dateToUse);
-      if (!isNaN(dateObj)) {
-        monthKey = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-      }
+      monthKey = isNaN(dateObj) ? 'General / No Date' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
     }
 
     if (!hrMonthlyBreakdown[monthKey]) {
@@ -591,15 +590,14 @@ export default function App() {
     else if (st === 'Yet to Join') hrMonthlyBreakdown[monthKey].yetToJoin += 1;
   });
 
+  // Fixed monthlyData so missing dates are not skipped
   const monthlyData = {};
   candidates.forEach(item => {
     const dateToUse = item.joining_date || item.selection_date;
-    let monthKey = 'Without Date / General';
+    let monthKey = 'General / No Date';
     if (dateToUse) {
       const dateObj = new Date(dateToUse);
-      if (!isNaN(dateObj)) {
-        monthKey = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-      }
+      monthKey = isNaN(dateObj) ? 'General / No Date' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
     }
 
     if (!monthlyData[monthKey]) {
@@ -694,8 +692,14 @@ export default function App() {
           from { opacity: 0; transform: scale(0.95); }
           to { opacity: 1; transform: scale(1); }
         }
+        @keyframes pulseGlow {
+          0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
         .animated-container { animation: fadeIn 0.35s ease-out forwards; }
         .animated-modal { animation: zoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .invoice-alert { animation: pulseGlow 2s infinite; }
         .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
         .modern-input { transition: all 0.2s ease; }
         .modern-input:focus { border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important; outline: none; }
@@ -706,10 +710,14 @@ export default function App() {
 
         .responsive-grid { display: grid; grid-template-columns: 1fr 2.8fr; gap: 20px; }
         .responsive-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .desktop-table-view { display: block; }
+        .mobile-card-view { display: none; }
 
         @media (max-width: 900px) {
           .responsive-grid { grid-template-columns: 1fr !important; }
           .responsive-stats { grid-template-columns: 1fr !important; }
+          .desktop-table-view { display: none !important; }
+          .mobile-card-view { display: block !important; }
         }
       `}</style>
 
@@ -723,17 +731,19 @@ export default function App() {
 
       <div className="animated-container" style={{ position: 'relative', zIndex: 1, maxWidth: '1400px', margin: '0 auto' }}>
         
-        {/* Navbar */}
+        {/* Navbar - Original UI */}
         <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', flexWrap: 'wrap', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ padding: '3px', background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', borderRadius: '50%', display: 'flex' }}>
               <img src={companyLogo} alt="Logo" style={{ width: '38px', height: '38px', objectFit: 'contain', borderRadius: '50%', backgroundColor: '#fff' }} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '800', background: 'linear-gradient(to right, #4f46e5, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                Omne JobGiants ({userRole === 'Partner' ? 'Partner Portal 👑' : `HR Portal • ${currentLoggedInHRName}`})
+              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '800', background: 'linear-gradient(to right, #1e293b, #475569)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Omne JobGiants
               </h1>
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Logged in as: <strong style={{ color: '#0f172a' }}>{loginEmail}</strong></span>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>
+                {userRole === 'Partner' ? 'Partner CRM' : `HR Portal • ${currentLoggedInHRName}`}
+              </span>
             </div>
           </div>
 
@@ -750,162 +760,226 @@ export default function App() {
           </div>
         </div>
 
-        {/* Missing Joining Date Notification for HR */}
-        {userRole === 'HR' && missingJoiningDateCandidates.length > 0 && (
-          <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '18px' }}>⚠️</span>
-            <div>
-              <strong style={{ fontSize: '12px', color: '#b45309' }}>Action Required:</strong>
-              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#92400e' }}>
-                You have {missingJoiningDateCandidates.length} selected candidate(s) without a Joining Date. Please update their joining dates as soon as confirmed!
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Main Dashboard Layout */}
-        <div className="responsive-grid">
-          
-          {/* Left Column: Form & Quick Actions */}
-          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', height: 'fit-content', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#0f172a', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>
-              {isEditing ? '✏️ Edit Candidate' : '➕ Add New Candidate'}
-            </h3>
-
-            <form onSubmit={handleFormSubmit}>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Candidate Name *</label>
-                <input type="text" placeholder="e.g. Rahul Sharma" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Email Address</label>
-                <input type="email" placeholder="rahul@email.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Phone Number</label>
-                <input type="text" placeholder="9876543210" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              {userRole === 'Partner' && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Assigned Internal HR *</label>
-                  {!isOtherSelected ? (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <select 
-                        value={formData.recruiter} 
-                        onChange={(e) => {
-                          if (e.target.value === 'OTHER') {
-                            setIsOtherSelected(true);
-                            setFormData({...formData, recruiter: ''});
-                          } else {
-                            setFormData({...formData, recruiter: e.target.value});
-                          }
-                        }}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}
-                      >
-                        <option value="">Select HR...</option>
-                        {predefinedHRs.map(hr => <option key={hr} value={hr}>{hr}</option>)}
-                        <option value="OTHER">➕ Add Other HR...</option>
-                      </select>
+        {/* HR Dashboard & Monthly Performance Summary (Original UI Layout) */}
+        {userRole === 'HR' ? (
+          <div>
+            {/* HR Monthly Summary Cards */}
+            {(() => {
+              const currentMonthName = Object.keys(hrMonthlyBreakdown)[0] || new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+              const currentData = hrMonthlyBreakdown[currentMonthName] || { total: 0, selected: 0, joined: 0, dropped: 0, rejected: 0 };
+              return (
+                <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+                  <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>📊 Your Monthly Performance Summary</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+                    <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: '700', color: '#64748b' }}>TOTAL HANDLED</p>
+                      <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#0f172a' }}>{currentData.total}</h3>
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Enter HR name..." 
-                        value={otherRecruiterInput} 
-                        onChange={(e) => setOtherRecruiterInput(e.target.value)}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }} 
-                      />
-                      <button type="button" onClick={() => { setIsOtherSelected(false); setOtherRecruiterInput(''); }} style={{ background: '#cbd5e1', border: 'none', padding: '0 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                    <div style={{ background: '#e0e7ff', padding: '14px', borderRadius: '12px', border: '1px solid #c7d2fe', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: '700', color: '#3730a3' }}>SELECTED</p>
+                      <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#3730a3' }}>{currentData.selected}</h3>
                     </div>
-                  )}
+                    <div style={{ background: '#dcfce7', padding: '14px', borderRadius: '12px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: '700', color: '#166534' }}>JOINED</p>
+                      <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#166534' }}>{currentData.joined}</h3>
+                    </div>
+                    <div style={{ background: '#fef3c7', padding: '14px', borderRadius: '12px', border: '1px solid #fde68a', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: '700', color: '#b45309' }}>DROPPED</p>
+                      <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#b45309' }}>{currentData.dropped}</h3>
+                    </div>
+                    <div style={{ background: '#fee2e2', padding: '14px', borderRadius: '12px', border: '1px solid #fecaca', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: '700', color: '#991b1b' }}>REJECTED</p>
+                      <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#991b1b' }}>{currentData.rejected}</h3>
+                    </div>
+                  </div>
                 </div>
-              )}
+              );
+            })()}
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Company Name *</label>
-                <select value={formData.company_name} onChange={(e) => setFormData({...formData, company_name: e.target.value})} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
-                  <option value="">Select Company...</option>
-                  {predefinedCompanies.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
+            {/* Main Form and Candidates List Grid for HR */}
+            <div className="responsive-grid">
+              {/* Left Form */}
+              <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', height: 'fit-content' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#0f172a', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>
+                  {isEditing ? '✏️ Edit Candidate' : `📝 Daily Entry Form (${currentLoggedInHRName})`}
+                </h3>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Process Name *</label>
-                <input type="text" placeholder="e.g. US Voice Process" value={formData.process_name} onChange={(e) => setFormData({...formData, process_name: e.target.value})} required className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
+                <form onSubmit={handleFormSubmit}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Candidate Name *</label>
+                    <input type="text" placeholder="e.g. Rahul Sharma" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Client POC</label>
-                <input type="text" placeholder="Client HR contact person" value={formData.client_poc} onChange={(e) => setFormData({...formData, client_poc: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Email Address</label>
+                    <input type="email" placeholder="rahul@email.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Selection Date</label>
-                <input type="date" value={formData.selection_date} onChange={(e) => setFormData({...formData, selection_date: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Phone Number *</label>
+                    <input type="text" placeholder="9876543210" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} required className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Joining Date (Optional)</label>
-                <input type="date" value={formData.joining_date} onChange={(e) => setFormData({...formData, joining_date: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Company Name *</label>
+                    <select value={formData.company_name} onChange={(e) => setFormData({...formData, company_name: e.target.value})} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
+                      <option value="">-- Select Client Company --</option>
+                      {predefinedCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
 
-              {userRole === 'Partner' && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Revenue (₹)</label>
-                  <input type="number" placeholder="e.g. 35000" value={formData.revenue} onChange={(e) => setFormData({...formData, revenue: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Process Name *</label>
+                    <input type="text" placeholder="e.g. US Voice Process" value={formData.process_name} onChange={(e) => setFormData({...formData, process_name: e.target.value})} required className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Client POC</label>
+                    <input type="text" placeholder="Client contact person" value={formData.client_poc} onChange={(e) => setFormData({...formData, client_poc: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Selection Date (Optional)</label>
+                    <input type="date" value={formData.selection_date} onChange={(e) => setFormData({...formData, selection_date: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Joining Date (Optional)</label>
+                    <input type="date" value={formData.joining_date} onChange={(e) => setFormData({...formData, joining_date: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Status *</label>
+                    <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
+                      <option value="Yet to Join">Yet to Join</option>
+                      <option value="Selected">Selected</option>
+                      <option value="Joined">Joined</option>
+                      <option value="Dropped">Dropped</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Remarks / Notes (Searchable)</label>
+                    <textarea placeholder="Add remarks..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows="2" className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="submit" style={{ flex: 1, padding: '10px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                      {isEditing ? 'Update Candidate 💾' : 'Submit Entry 🚀'}
+                    </button>
+                    {isEditing && (
+                      <button type="button" onClick={() => { setIsEditing(false); setFormData({ name: '', email: '', phone: '', recruiter: currentLoggedInHRName, company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ background: '#cbd5e1', border: 'none', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={downloadSampleCSV} style={{ flex: 1, background: '#0284c7', color: '#fff', border: 'none', padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                      📥 CSV Template
+                    </button>
+                    <label style={{ flex: 1, background: '#7c3aed', color: '#fff', padding: '8px', borderRadius: '8px', textAlign: 'center', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                      📁 Bulk Upload
+                      <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+                    </label>
+                  </div>
                 </div>
-              )}
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Candidate Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
-                  <option value="Yet to Join">Yet to Join</option>
-                  <option value="Selected">Selected</option>
-                  <option value="Joined">Joined</option>
-                  <option value="Dropped">Dropped</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Remarks / Notes (Searchable)</label>
-                <textarea placeholder="Add remarks or notes..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows="2" className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
+              {/* Right Table */}
+              <div className="glass-card" style={{ padding: '20px', borderRadius: '16px' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Your Submitted Candidates ({filteredCandidates.length})</h3>
+                
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Search name, company, or remarks..." 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ flex: 1, minWidth: '200px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                  />
+                  <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
+                    <option value="All">All Status</option>
+                    <option value="Yet to Join">Yet to Join</option>
+                    <option value="Selected">Selected</option>
+                    <option value="Joined">Joined</option>
+                    <option value="Dropped">Dropped</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" style={{ flex: 1, padding: '10px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
-                  {isEditing ? 'Update Candidate 💾' : 'Add Candidate 🚀'}
-                </button>
-                {isEditing && (
-                  <button type="button" onClick={() => { setIsEditing(false); setFormData({ name: '', email: '', phone: '', recruiter: userRole === 'HR' ? currentLoggedInHRName : '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ background: '#cbd5e1', border: 'none', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                    Cancel
+                <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
+                        <th style={{ padding: '10px' }}>Candidate</th>
+                        <th style={{ padding: '10px' }}>Company & Process</th>
+                        <th style={{ padding: '10px' }}>Dates</th>
+                        <th style={{ padding: '10px' }}>Stage</th>
+                        <th style={{ padding: '10px' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCandidates.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No candidates found.</td>
+                        </tr>
+                      ) : (
+                        filteredCandidates.map((item) => (
+                          <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '10px' }}>
+                              <strong style={{ color: '#0f172a', display: 'block' }}>{item.name}</strong>
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>📞 {item.phone || 'N/A'} • ✉️ {item.email || 'N/A'}</span>
+                              {item.notes && <span style={{ fontSize: '10px', color: '#059669', display: 'block', fontStyle: 'italic' }}>Note: {item.notes}</span>}
+                            </td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ fontWeight: '600', color: '#334155' }}>🏢 {item.company_name}</span>
+                              <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Proc: {item.process_name} • HR: {item.recruiter}</span>
+                            </td>
+                            <td style={{ padding: '10px', fontSize: '11px', color: '#64748b' }}>
+                              Sel: {item.selection_date || 'N/A'}<br/>
+                              Join: <span style={{ color: item.joining_date ? '#059669' : '#dc2626', fontWeight: '600' }}>{item.joining_date || 'N/A'}</span>
+                            </td>
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ 
+                                padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
+                                backgroundColor: item.status === 'Joined' ? '#dcfce7' : item.status === 'Selected' ? '#e0e7ff' : '#fee2e2',
+                                color: item.status === 'Joined' ? '#166534' : item.status === 'Selected' ? '#3730a3' : '#991b1b'
+                              }}>
+                                {item.status}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px' }}>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button onClick={() => handleEditClick(item)} style={{ background: '#e0e7ff', color: '#3730a3', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                                <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#fee2e2', color: '#991b1b', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Del</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={() => {
+                    const currentMonthName = Object.keys(hrMonthlyBreakdown)[0] || new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+                    const hrData = hrMonthlyBreakdown[currentMonthName] || { joined: 0, dropped: 0 };
+                    sendHRPerformanceEmail(currentLoggedInHRName, currentMonthName, hrData);
+                  }} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                    📧 Send Monthly Report Email
                   </button>
-                )}
-              </div>
-            </form>
-
-            <div style={{ marginTop: '24px', borderTop: '2px solid #f1f5f9', paddingTop: '16px' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>📁 Bulk Upload & CSV</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button type="button" onClick={downloadSampleCSV} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155', padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-                  📥 Download Sample CSV
-                </button>
-                <label style={{ background: '#f1f5f9', border: '1px dashed #94a3b8', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '11px', fontWeight: '700', cursor: 'pointer', color: '#475569' }}>
-                  📤 Upload Bulk CSV File
-                  <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
-                </label>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Right Column: Candidate Database Table & Analytics */}
-          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-            
-            {/* Top Metric Cards */}
+        ) : (
+          /* Partner Portal Layout (Original) */
+          <div>
             <div className="responsive-stats">
               <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '16px', borderRadius: '12px' }}>
                 <p style={{ margin: '0 0 4px 0', fontSize: '11px', opacity: 0.9, fontWeight: '600' }}>TOTAL ACTIVE REVENUE</p>
@@ -917,127 +991,105 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filters & Search */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <input 
-                type="text" 
-                placeholder="🔍 Search name, phone, company, or remarks..." 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="modern-input"
-                style={{ flex: 1, minWidth: '220px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-              />
-
-              <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
-                <option value="All">All Stages</option>
-                <option value="Yet to Join">Yet to Join</option>
-                <option value="Selected">Selected</option>
-                <option value="Joined">Joined</option>
-                <option value="Dropped">Dropped</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-
-              {userRole === 'Partner' && (
+            <div className="glass-card" style={{ padding: '20px', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <input 
+                  type="text" 
+                  placeholder="Search name, phone, company, or remarks..." 
+                  value={searchTerm} 
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ flex: 1, minWidth: '220px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                />
+                <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
+                  <option value="All">All Stages</option>
+                  <option value="Yet to Join">Yet to Join</option>
+                  <option value="Selected">Selected</option>
+                  <option value="Joined">Joined</option>
+                  <option value="Dropped">Dropped</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
                 <select value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
                   <option value="All">All Recruiters</option>
                   {allRecruiters.map(hr => <option key={hr} value={hr}>{hr}</option>)}
                 </select>
-              )}
-            </div>
+              </div>
 
-            {/* Candidate Table */}
-            <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                    <th style={{ padding: '10px' }}>Candidate</th>
-                    <th style={{ padding: '10px' }}>Company / Process</th>
-                    <th style={{ padding: '10px' }}>Recruiter</th>
-                    <th style={{ padding: '10px' }}>Dates</th>
-                    {userRole === 'Partner' && <th style={{ padding: '10px' }}>Revenue</th>}
-                    <th style={{ padding: '10px' }}>Status</th>
-                    <th style={{ padding: '10px' }}>Invoice</th>
-                    <th style={{ padding: '10px' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCandidates.length === 0 ? (
-                    <tr>
-                      <td colSpan={userRole === 'Partner' ? 8 : 7} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-                        No candidates found.
-                      </td>
+              <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
+                      <th style={{ padding: '10px' }}>Candidate</th>
+                      <th style={{ padding: '10px' }}>Company / Process</th>
+                      <th style={{ padding: '10px' }}>Recruiter</th>
+                      <th style={{ padding: '10px' }}>Dates</th>
+                      <th style={{ padding: '10px' }}>Revenue</th>
+                      <th style={{ padding: '10px' }}>Status</th>
+                      <th style={{ padding: '10px' }}>Invoice</th>
+                      <th style={{ padding: '10px' }}>Actions</th>
                     </tr>
-                  ) : (
-                    filteredCandidates.map((item) => (
-                      <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px' }}>
-                          <strong style={{ color: '#0f172a', display: 'block' }}>{item.name}</strong>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>{item.phone || item.email || 'No contact'}</span>
-                          {item.notes && <span style={{ fontSize: '10px', color: '#059669', display: 'block', fontStyle: 'italic' }}>Note: {item.notes}</span>}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span style={{ fontWeight: '600', color: '#334155' }}>{item.company_name}</span>
-                          <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{item.process_name}</span>
-                        </td>
-                        <td style={{ padding: '10px', color: '#475569', fontWeight: '500' }}>{item.recruiter}</td>
-                        <td style={{ padding: '10px', fontSize: '11px', color: '#64748b' }}>
-                          Sel: {item.selection_date || 'N/A'}<br/>
-                          Join: <span style={{ color: item.joining_date ? '#059669' : '#dc2626', fontWeight: '600' }}>{item.joining_date || 'Pending'}</span>
-                        </td>
-                        {userRole === 'Partner' && (
-                          <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>₹ {parseFloat(item.revenue || 0).toLocaleString('en-IN')}</td>
-                        )}
-                        <td style={{ padding: '10px' }}>
-                          <span style={{ 
-                            padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
-                            backgroundColor: item.status === 'Joined' ? '#dcfce7' : item.status === 'Selected' ? '#e0e7ff' : '#fee2e2',
-                            color: item.status === 'Joined' ? '#166534' : item.status === 'Selected' ? '#3730a3' : '#991b1b'
-                          }}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span style={{ 
-                            padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
-                            backgroundColor: item.invoice_status === 'Paid' ? '#dcfce7' : item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : '#f1f5f9',
-                            color: item.invoice_status === 'Paid' ? '#166534' : item.invoice_status === 'Ready to Invoice' ? '#b45309' : '#475569'
-                          }}>
-                            {item.invoice_status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button onClick={() => handleEditClick(item)} style={{ background: '#e0e7ff', color: '#3730a3', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
-                            <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#fee2e2', color: '#991b1b', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Del</button>
-                          </div>
-                        </td>
+                  </thead>
+                  <tbody>
+                    {filteredCandidates.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>No candidates found.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      filteredCandidates.map((item) => (
+                        <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px' }}>
+                            <strong style={{ color: '#0f172a', display: 'block' }}>{item.name}</strong>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>{item.phone || item.email || 'No contact'}</span>
+                            {item.notes && <span style={{ fontSize: '10px', color: '#059669', display: 'block', fontStyle: 'italic' }}>Note: {item.notes}</span>}
+                          </td>
+                          <td style={{ padding: '10px' }}>
+                            <span style={{ fontWeight: '600', color: '#334155' }}>{item.company_name}</span>
+                            <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{item.process_name}</span>
+                          </td>
+                          <td style={{ padding: '10px', color: '#475569', fontWeight: '500' }}>{item.recruiter}</td>
+                          <td style={{ padding: '10px', fontSize: '11px', color: '#64748b' }}>
+                            Sel: {item.selection_date || 'N/A'}<br/>
+                            Join: {item.joining_date || 'N/A'}
+                          </td>
+                          <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>₹ {parseFloat(item.revenue || 0).toLocaleString('en-IN')}</td>
+                          <td style={{ padding: '10px' }}>
+                            <span style={{ 
+                              padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
+                              backgroundColor: item.status === 'Joined' ? '#dcfce7' : item.status === 'Selected' ? '#e0e7ff' : '#fee2e2',
+                              color: item.status === 'Joined' ? '#166534' : item.status === 'Selected' ? '#3730a3' : '#991b1b'
+                            }}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px' }}>
+                            <span style={{ 
+                              padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
+                              backgroundColor: item.invoice_status === 'Paid' ? '#dcfce7' : item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : '#f1f5f9',
+                              color: item.invoice_status === 'Paid' ? '#166534' : item.invoice_status === 'Ready to Invoice' ? '#b45309' : '#475569'
+                            }}>
+                              {item.invoice_status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px' }}>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button onClick={() => handleEditClick(item)} style={{ background: '#e0e7ff', color: '#3730a3', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                              <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#fee2e2', color: '#991b1b', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Del</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-            {/* Email Reporting Section */}
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              {userRole === 'HR' && (
-                <button onClick={() => {
-                  const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-                  const hrData = hrMonthlyBreakdown[currentMonthName] || { joined: 0, dropped: 0 };
-                  sendHRPerformanceEmail(currentLoggedInHRName, currentMonthName, hrData);
-                }} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                  📧 Send My Monthly Report to Management
-                </button>
-              )}
-              {userRole === 'Partner' && (
+              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
                 <button onClick={sendMonthlyReportEmail} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                   📊 Send Master Monthly Report Email
                 </button>
-              )}
+              </div>
             </div>
-
           </div>
-        </div>
+        )}
 
       </div>
 
