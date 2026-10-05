@@ -142,7 +142,7 @@ export default function App() {
         let currentInvoiceStatus = item.invoice_status;
         if (item.status === 'Dropped' || item.status === 'Rejected') {
           currentInvoiceStatus = 'Cancelled';
-        } else if (diffDays >= 91 && currentInvoiceStatus === 'Pending') {
+        } else if (diffDays > 90 && currentInvoiceStatus === 'Pending') {
           currentInvoiceStatus = 'Ready to Invoice';
         }
 
@@ -378,7 +378,7 @@ export default function App() {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
       + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
-      + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,,25000,Yet to Join,Called on Monday";
+      + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -539,11 +539,6 @@ export default function App() {
 
   const currentLoggedInHRName = userRole === 'HR' ? hrDatabase[loginEmail.trim().toLowerCase()]?.name : '';
 
-  // Candidates with missing joining date (for notifications)
-  const missingJoiningDateCandidates = candidates.filter(item => 
-    userRole === 'HR' && item.recruiter === currentLoggedInHRName && item.selection_date && !item.joining_date && item.status !== 'Dropped' && item.status !== 'Rejected'
-  );
-
   const filteredCandidates = candidates.filter((item) => {
     const matchesSearch = 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||  
@@ -552,8 +547,7 @@ export default function App() {
       (item.process_name && item.process_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.client_poc && item.client_poc.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (item.phone && item.phone.includes(searchTerm)) ||
-      (item.notes && item.notes.toLowerCase().includes(searchTerm.toLowerCase())); // Added Remarks/Notes search support
+      (item.phone && item.phone.includes(searchTerm));
     
     const matchesStatus = filterInvoiceStatus === 'All' || item.invoice_status === filterInvoiceStatus;
     const matchesStage = filterStage === 'All' || item.status === filterStage;
@@ -730,331 +724,732 @@ export default function App() {
               <img src={companyLogo} alt="Logo" style={{ width: '38px', height: '38px', objectFit: 'contain', borderRadius: '50%', backgroundColor: '#fff' }} />
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '800', background: 'linear-gradient(to right, #4f46e5, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                Omne JobGiants CRM ({userRole === 'Partner' ? 'Partner Portal 👑' : 'HR Portal 👤'})
+              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '800', background: 'linear-gradient(to right, #1e293b, #475569)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Omne JobGiants
               </h1>
-              <p style={{ margin: 0, fontSize: '11px', color: '#64748b', fontWeight: '500' }}>Logged in as: <strong style={{ color: '#0f172a' }}>{loginEmail}</strong></p>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>
+                {userRole === 'Partner' ? 'Partner CRM' : `HR Portal • ${currentLoggedInHRName}`}
+              </span>
             </div>
           </div>
-
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             {userRole === 'Partner' && (
-              <label style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', color: '#334155' }}>
-                📷 Update Logo
-                <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
-              </label>
+              <>
+                <button 
+                  onClick={() => setFilterInvoiceStatus('Invoice Raised / Pending Clearance')}
+                  style={{ 
+                    background: pendingInvoicesList.length > 0 ? '#ef4444' : '#e2e8f0', 
+                    color: pendingInvoicesList.length > 0 ? '#fff' : '#334155', 
+                    border: 'none', padding: '7px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                  }}
+                >
+                  🔔 Pending ({pendingInvoicesList.length})
+                </button>
+
+                <button onClick={sendMonthlyReportEmail} style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                  📧 Report
+                </button>
+
+                <button onClick={downloadSampleCSV} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                  📥 CSV Template
+                </button>
+
+                <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }}>
+                  📂 Bulk Upload
+                  <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+                </label>
+
+                <label style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '7px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                  🖼 Logo
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                </label>
+
+                <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px', gap: '2px' }}>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Dash</button>
+                  <button onClick={() => setActiveTab('reports')} style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Reports</button>
+                  <button onClick={() => setActiveTab('audit')} style={{ padding: '6px 10px', background: activeTab === 'audit' ? '#fff' : 'transparent', color: activeTab === 'audit' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Audit History</button>
+                </div>
+              </>
             )}
-            <button onClick={() => setIsLoggedIn(false)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>
-              Logout 🚪
+
+            {userRole === 'HR' && (
+              <>
+                <button onClick={downloadSampleCSV} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+                  📥 CSV Template
+                </button>
+
+                <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }}>
+                  📂 Bulk Upload
+                  <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+                </label>
+
+                <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px', gap: '2px' }}>
+                  <button onClick={() => setActiveTab('dashboard')} style={{ padding: '6px 10px', background: activeTab === 'dashboard' ? '#fff' : 'transparent', color: activeTab === 'dashboard' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Dash</button>
+                  <button onClick={() => setActiveTab('reports')} style={{ padding: '6px 10px', background: activeTab === 'reports' ? '#fff' : 'transparent', color: activeTab === 'reports' ? '#0f172a' : '#64748b', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '11px', cursor: 'pointer' }}>Reports</button>
+                </div>
+              </>
+            )}
+
+            <button onClick={() => setIsLoggedIn(false)} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+              🔒 Logout
             </button>
           </div>
         </div>
 
-        {/* Missing Joining Date Notification for HR */}
-        {userRole === 'HR' && missingJoiningDateCandidates.length > 0 && (
-          <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '18px' }}>⚠️</span>
-            <div>
-              <strong style={{ fontSize: '12px', color: '#b45309' }}>Action Required:</strong>
-              <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#92400e' }}>
-                You have {missingJoiningDateCandidates.length} selected candidate(s) without a Joining Date. Please update their joining dates as soon as confirmed!
+        {/* Audit History Tab */}
+        {userRole === 'Partner' && activeTab === 'audit' ? (
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+            <h2 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>
+              🛡️ Partner Portal Activity & Deletion Audit History
+            </h2>
+            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
+              This log tracks which partner email performed which action (edit or delete) on which candidate, along with the exact date and time.
+            </p>
+
+            {auditLogs.length === 0 ? (
+              <p style={{ color: '#64748b', fontSize: '13px' }}>No deletion or edit action history recorded yet.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569', fontWeight: '700' }}>
+                      <th style={{ padding: '10px' }}>Partner Email</th>
+                      <th style={{ padding: '10px' }}>Action Type</th>
+                      <th style={{ padding: '10px' }}>Candidate Name</th>
+                      <th style={{ padding: '10px' }}>Company</th>
+                      <th style={{ padding: '10px' }}>Date & Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log) => {
+                      const dt = new Date(log.action_timestamp);
+                      const formattedDate = isNaN(dt) ? log.action_timestamp : dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'medium' });
+                      return (
+                        <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px', fontWeight: '700', color: '#4f46e5' }}>{log.partner_email}</td>
+                          <td style={{ padding: '10px' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '10px', fontWeight: '700', background: log.action_type === 'DELETE' ? '#fee2e2' : '#e0e7ff', color: log.action_type === 'DELETE' ? '#991b1b' : '#3730a3', fontSize: '10px' }}>
+                              {log.action_type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>{log.candidate_name}</td>
+                          <td style={{ padding: '10px', color: '#334155' }}>{log.candidate_company}</td>
+                          <td style={{ padding: '10px', color: '#64748b', fontSize: '11px' }}>{formattedDate}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'reports' ? (
+          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <h2 style={{ margin: 0, color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>
+                {userRole === 'HR' ? '📊 Your Month-Wise Performance Reports' : 'Month-wise Revenue & HR Performance'}
+              </h2>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569' }}>Filter Month:</label>
+                <select 
+                  className="modern-input" 
+                  value={userRole === 'HR' ? hrSelectedReportMonth : selectedReportMonth} 
+                  onChange={(e) => userRole === 'HR' ? setHrSelectedReportMonth(e.target.value) : setSelectedReportMonth(e.target.value)} 
+                  style={{ padding: '7px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff', fontWeight: '700' }}
+                >
+                  <option value="All">All Months</option>
+                  {userRole === 'HR' ? (
+                    Object.keys(hrMonthlyBreakdown).map(m => <option key={m} value={m}>{m}</option>)
+                  ) : (
+                    Object.keys(monthlyData).map(m => <option key={m} value={m}>{m}</option>)
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {userRole === 'HR' ? (
+              Object.keys(hrMonthlyBreakdown).length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
+              ) : (
+                Object.keys(hrMonthlyBreakdown)
+                  .filter(month => hrSelectedReportMonth === 'All' || month === hrSelectedReportMonth)
+                  .map((month) => {
+                    const mData = hrMonthlyBreakdown[month];
+                    return (
+                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                          <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
+                          <div style={{ display: 'flex', gap: '8px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
+                            <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 8px', borderRadius: '6px' }}>Total: {mData.total}</span>
+                            <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '4px 8px', borderRadius: '6px' }}>Selected: {mData.selected}</span>
+                            <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 8px', borderRadius: '6px' }}>Joined: {mData.joined}</span>
+                            <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 8px', borderRadius: '6px' }}>Dropped: {mData.dropped}</span>
+                            <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 8px', borderRadius: '6px' }}>Rejected: {mData.rejected}</span>
+                          </div>
+                        </div>
+
+                        <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#334155', fontWeight: '700' }}>Candidates List for {month}:</h4>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                            <thead>
+                              <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569' }}>
+                                <th style={{ padding: '8px' }}>Candidate Name</th>
+                                <th style={{ padding: '8px' }}>Company & Process</th>
+                                <th style={{ padding: '8px' }}>Joining Date</th>
+                                <th style={{ padding: '8px' }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {mData.candidates.map(c => (
+                                <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '8px', fontWeight: '700', color: '#0f172a' }}>{c.name}</td>
+                                  <td style={{ padding: '8px' }}>{c.company_name} ({c.process_name})</td>
+                                  <td style={{ padding: '8px' }}>{c.joining_date || 'N/A'}</td>
+                                  <td style={{ padding: '8px' }}>
+                                    <span style={{ padding: '2px 6px', borderRadius: '10px', fontWeight: '700', background: c.status === 'Joined' ? '#d1fae5' : '#fef3c7', color: c.status === 'Joined' ? '#065f46' : '#b45309' }}>
+                                      {c.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })
+              )
+            ) : (
+              Object.keys(monthlyData).length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '13px' }}>No records found for reporting.</p>
+              ) : (
+                Object.keys(monthlyData)
+                  .filter(month => selectedReportMonth === 'All' || month === selectedReportMonth)
+                  .map((month) => {
+                    const mData = monthlyData[month];
+                    const sortedHRs = Object.keys(mData.recruiters).sort((a, b) => mData.recruiters[b].revenue - mData.recruiters[a].revenue);
+                    const topHRName = sortedHRs[0] || 'N/A';
+
+                    return (
+                      <div key={month} style={{ marginBottom: '24px', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '16px', background: '#fff' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                          <h3 style={{ margin: 0, color: '#4f46e5', fontSize: '16px', fontWeight: '800' }}>📅 {month}</h3>
+                          <div style={{ display: 'flex', gap: '10px', fontSize: '11px', fontWeight: '700', flexWrap: 'wrap' }}>
+                            <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '6px' }}>Total Rev: Rs. {mData.totalRevenue.toLocaleString('en-IN')}</span>
+                            <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: '6px' }}>Total Selections: {mData.joinedCount}</span>
+                            <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 10px', borderRadius: '6px' }}>Total Drops: {mData.droppedCount}</span>
+                            <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: '6px' }}>🏆 Top HR: {topHRName}</span>
+                          </div>
+                        </div>
+
+                        <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#334155', fontWeight: '700' }}>HR Individual Performance & 1-Click Monthly Reports:</h4>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                          {Object.keys(mData.recruiters).map(hrName => {
+                            const hrStats = mData.recruiters[hrName];
+                            const hasEmailRegistered = hrEmailDirectory[hrName];
+
+                            return (
+                              <div key={hrName} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                <div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>👤 {hrName}</strong>
+                                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#059669', background: '#d1fae5', padding: '2px 6px', borderRadius: '4px' }}>Rs. {hrStats.revenue.toLocaleString('en-IN')}</span>
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#475569', marginBottom: '8px', display: 'flex', gap: '12px' }}>
+                                    <span>Joined/Selected: <strong>{hrStats.joined}</strong></span>
+                                    <span>Dropped: <strong style={{ color: '#ef4444' }}>{hrStats.dropped}</strong></span>
+                                  </div>
+                                </div>
+
+                                {hasEmailRegistered ? (
+                                  <button onClick={() => sendHRPerformanceEmail(hrName, month, hrStats)} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: '6px' }}>
+                                    ✉️ Email Report to {hrName}
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', marginTop: '6px' }}>Email not configured</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+              )
+            )}
+          </div>
+        ) : (
+          <>
+            {userRole === 'Partner' && (
+              <div className="responsive-stats">
+                <div style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', padding: '16px', borderRadius: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
+                    {filterHR === 'All' ? 'Active Revenue Pipeline' : `Revenue (${filterHR})`}
+                  </h3>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '24px', fontWeight: '800' }}>Rs. {totalRevenue.toLocaleString('en-IN')}</p>
+                </div>
+                <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '16px', borderRadius: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, fontWeight: '700' }}>
+                    {filterHR === 'All' ? 'Active Lateral Hirings (≥ 30k)' : `Lateral Hirings (${filterHR})`}
+                  </h3>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '24px', fontWeight: '800' }}>{lateralHiringCount} Candidates</p>
+                </div>
+              </div>
+            )}
+
+            {userRole === 'HR' && (
+              <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>📊 Your Monthly Performance Summary</h3>
+                {(() => {
+                  let calcTotal = 0, calcSelected = 0, calcJoined = 0, calcDropped = 0, calcRejected = 0;
+                  Object.values(hrMonthlyBreakdown).forEach(val => {
+                    calcTotal += val.total; calcSelected += val.selected; calcJoined += val.joined; calcDropped += val.dropped; calcRejected += val.rejected;
+                  });
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Total Handled</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#0f172a' }}>{calcTotal}</p>
+                      </div>
+                      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#1d4ed8', fontWeight: '700', textTransform: 'uppercase' }}>Selected</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#1e40af' }}>{calcSelected}</p>
+                      </div>
+                      <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#047857', fontWeight: '700', textTransform: 'uppercase' }}>Joined</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#065f46' }}>{calcJoined}</p>
+                      </div>
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#b45309', fontWeight: '700', textTransform: 'uppercase' }}>Dropped</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#92400e' }}>{calcDropped}</p>
+                      </div>
+                      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#b91c1c', fontWeight: '700', textTransform: 'uppercase' }}>Rejected</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#991b1b' }}>{calcRejected}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            <div className="responsive-grid">
+              
+              {/* Form Card */}
+              <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)', height: 'fit-content' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '14px', fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
+                  {userRole === 'HR' ? (isEditing ? '✏️ Edit Entry' : `📝 Daily Entry Form (${currentLoggedInHRName})`) : (isEditing ? '✏ Edit Candidate' : '➕ Add Candidate')}
+                </h3>
+                <form onSubmit={handleFormSubmit}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Candidate Name *</label>
+                    <input type="text" className="modern-input" placeholder="e.g. Rahul Sharma" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Email Address</label>
+                    <input type="email" className="modern-input" placeholder="candidate@email.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Phone Number *</label>
+                    <input type="text" className="modern-input" placeholder="9876543210" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Company Name *</label>
+                    <select 
+                      className="modern-input"
+                      value={formData.company_name} 
+                      onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} 
+                      required 
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '12px' }}
+                    >
+                      <option value="" disabled>-- Select Client Company --</option>
+                      {predefinedCompanies.map(comp => <option key={comp} value={comp}>{comp}</option>)}
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Process Name *</label>
+                    <input type="text" className="modern-input" placeholder="e.g. US Voice" value={formData.process_name} onChange={(e) => setFormData({ ...formData, process_name: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                  </div>
+                  
+                  {userRole === 'Partner' && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Internal HR Name *</label>
+                      <select 
+                        className="modern-input"
+                        value={isOtherSelected ? 'Other' : formData.recruiter} 
+                        onChange={(e) => {
+                          if (e.target.value === 'Other') {
+                            setIsOtherSelected(true);
+                            setFormData({ ...formData, recruiter: '' });
+                          } else {
+                            setIsOtherSelected(false);
+                            setFormData({ ...formData, recruiter: e.target.value });
+                          }
+                        }} 
+                        required={!isOtherSelected}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '12px' }}
+                      >
+                        <option value="" disabled>-- Select HR --</option>
+                        {predefinedHRs.map(hr => <option key={hr} value={hr}>{hr}</option>)}
+                        <option value="Other">➕ Other</option>
+                      </select>
+
+                      {isOtherSelected && (
+                        <input 
+                          type="text" className="modern-input" placeholder="Enter new HR name..." 
+                          value={otherRecruiterInput} onChange={(e) => setOtherRecruiterInput(e.target.value)} required 
+                          style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #6366f1', boxSizing: 'border-box', marginTop: '6px', fontSize: '12px' }} 
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Selection Date (Optional)</label>
+                    <input type="date" className="modern-input" value={formData.selection_date} onChange={(e) => setFormData({ ...formData, selection_date: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                  </div>
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Joining Date *</label>
+                    <input type="date" className="modern-input" value={formData.joining_date} onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                  </div>
+
+                  {userRole === 'Partner' && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Revenue (INR) *</label>
+                      <input type="number" className="modern-input" placeholder="e.g. 35000" value={formData.revenue} onChange={(e) => setFormData({ ...formData, revenue: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Candidate Status</label>
+                    <select className="modern-input" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px', backgroundColor: '#fff' }}>
+                      <option value="Yet to Join">Yet to Join</option>
+                      <option value="Selected">Selected</option>
+                      <option value="Joined">Joined</option>
+                      <option value="Dropped">Dropped</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Notes / Remarks</label>
+                    <textarea 
+                      className="modern-input" placeholder="Remarks..." value={formData.notes} 
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows="2"
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', resize: 'vertical', fontSize: '12px' }} 
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="submit" style={{ flex: 1, padding: '9px', background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                      {userRole === 'HR' ? (isEditing ? 'Update Entry 🚀' : 'Submit Entry 🚀') : (isEditing ? 'Update Candidate' : 'Save Candidate')}
+                    </button>
+                    {isEditing && (
+                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '9px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              {/* Data Display Section */}
+              <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
+                    {userRole === 'HR' ? `Your Submitted Candidates (${filteredCandidates.length})` : `Directory (${filteredCandidates.length})`}
+                  </h3>
+                  
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', width: '100%' }}>
+                    <input type="text" className="modern-input" placeholder="Search name, company..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '110px', fontSize: '11px' }} />
+                    
+                    {userRole === 'Partner' && (
+                      <select className="modern-input" value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '85px', fontSize: '11px', backgroundColor: '#fff' }}>
+                        <option value="All">All HRs</option>
+                        {allRecruiters.map(hr => <option key={hr} value={hr}>{hr}</option>)}
+                      </select>
+                    )}
+
+                    <select className="modern-input" value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '95px', fontSize: '11px', backgroundColor: '#fff' }}>
+                      <option value="All">All Status</option>
+                      <option value="Yet to Join">Yet to Join</option>
+                      <option value="Selected">Selected</option>
+                      <option value="Joined">Joined</option>
+                      <option value="Dropped">Dropped</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+
+                    {userRole === 'Partner' && (
+                      <select className="modern-input" value={filterInvoiceStatus} onChange={(e) => setFilterInvoiceStatus(e.target.value)} style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', flex: '1', minWidth: '100px', fontSize: '11px', backgroundColor: '#fff' }}>
+                        <option value="All">All Invoices</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Ready to Invoice">Ready</option>
+                        <option value="Invoice Raised / Pending Clearance">Pending Clearance</option>
+                        <option value="Paid">Paid</option>
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {/* DESKTOP TABLE VIEW */}
+                <div className="desktop-table-view" style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '650px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569', fontWeight: '700' }}>
+                        <th style={{ padding: '9px 10px', borderTopLeftRadius: '8px', borderBottomLeftRadius: '8px' }}>Candidate</th>
+                        <th style={{ padding: '9px 10px' }}>Company & Process</th>
+                        <th style={{ padding: '9px 10px' }}>Dates</th>
+                        {userRole === 'Partner' && <th style={{ padding: '9px 10px' }}>Revenue</th>}
+                        <th style={{ padding: '9px 10px' }}>Stage</th>
+                        {userRole === 'Partner' && <th style={{ padding: '9px 10px' }}>Invoice Status</th>}
+                        <th style={{ padding: '9px 10px', borderTopRightRadius: '8px', borderBottomRightRadius: '8px' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCandidates.map((item) => {
+                        const rev = parseFloat(item.revenue || 0);
+                        return (
+                          <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9', opacity: (item.status === 'Dropped' || item.status === 'Rejected') ? 0.6 : 1 }}>
+                            <td style={{ padding: '10px' }}>
+                              <div onClick={() => setSelectedCandidate(item)} style={{ fontWeight: '700', color: '#4f46e5', cursor: 'pointer' }}>{item.name}</div>
+                              <div style={{ fontSize: '10px', color: '#64748b' }}>📞 {item.phone || 'N/A'} • ✉️ {item.email || 'N/A'}</div>
+                            </td>
+                            <td style={{ padding: '10px' }}>
+                              <div style={{ fontWeight: '700', color: '#1e293b' }}>🏢 {item.company_name || 'N/A'}</div>
+                              <div style={{ fontSize: '10px', color: '#475569' }}>Proc: {item.process_name || 'N/A'} • HR: {item.recruiter}</div>
+                            </td>
+                            <td style={{ padding: '10px', fontSize: '11px', color: '#475569' }}>
+                              {item.selection_date && <div>Sel: {item.selection_date}</div>}
+                              <div>Join: {item.joining_date || 'N/A'}</div>
+                            </td>
+                            {userRole === 'Partner' && (
+                              <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>Rs. {rev.toLocaleString('en-IN')}</td>
+                            )}
+                            <td style={{ padding: '10px' }}>
+                              <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', background: item.status === 'Joined' ? '#d1fae5' : '#fef3c7', color: item.status === 'Joined' ? '#065f46' : '#b45309' }}>
+                                {item.status}
+                              </span>
+                            </td>
+                            {userRole === 'Partner' && (
+                              <td style={{ padding: '10px' }}>
+                                <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', background: item.invoice_status === 'Paid' ? '#d1fae5' : item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#fee2e2' : '#f1f5f9', color: item.invoice_status === 'Paid' ? '#065f46' : item.invoice_status === 'Invoice Raised / Pending Clearance' ? '#991b1b' : '#334155' }}>
+                                  {item.invoice_status}
+                                </span>
+                                {item.invoice_number && <div style={{ fontSize: '9px', color: '#4f46e5', marginTop: '2px', fontWeight: '700' }}>Inv#: {item.invoice_number}</div>}
+                              </td>
+                            )}
+                            <td style={{ padding: '10px' }}>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                {userRole === 'Partner' && (item.invoice_status === 'Ready to Invoice' || item.invoice_status === 'Invoice Raised / Pending Clearance') && (
+                                  <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Paid</button>
+                                )}
+                                <button onClick={() => handleEditClick(item)} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Edit</button>
+                                <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>Del</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* MOBILE CARD VIEW */}
+                <div className="mobile-card-view">
+                  {filteredCandidates.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '20px' }}>No candidates found.</p>
+                  ) : (
+                    filteredCandidates.map((item) => {
+                      const rev = parseFloat(item.revenue || 0);
+                      return (
+                        <div key={item.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', marginBottom: '10px', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                            <div>
+                              <div onClick={() => setSelectedCandidate(item)} style={{ fontWeight: '800', color: '#4f46e5', fontSize: '13px', cursor: 'pointer' }}>{item.name}</div>
+                              <div style={{ fontSize: '11px', color: '#1e293b', fontWeight: '600' }}>🏢 {item.company_name} ({item.process_name})</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              {userRole === 'Partner' && <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '12px' }}>Rs. {rev.toLocaleString('en-IN')}</div>}
+                              <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: '700', background: item.status === 'Joined' ? '#d1fae5' : '#fef3c7', color: item.status === 'Joined' ? '#065f46' : '#b45309' }}>
+                                {item.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>HR: <strong>{item.recruiter}</strong></span>
+                            <span>Join: {item.joining_date || 'N/A'}</span>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                            {userRole === 'Partner' ? (
+                              <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '6px', background: item.invoice_status === 'Paid' ? '#d1fae5' : '#fee2e2', color: item.invoice_status === 'Paid' ? '#065f46' : '#991b1b' }}>
+                                {item.invoice_status} {item.invoice_number ? `(#${item.invoice_number})` : ''}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '10px', color: '#64748b' }}>Submitted by you</span>
+                            )}
+                            
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                              {userRole === 'Partner' && (item.invoice_status === 'Ready to Invoice' || item.invoice_status === 'Invoice Raised / Pending Clearance') && (
+                                <button onClick={() => setPaymentModalCandidate(item)} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Paid</button>
+                              )}
+                              <button onClick={() => handleEditClick(item)} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Edit</button>
+                              <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700' }}>Del</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+              </div>
+
+            </div>
+          </>
+        )}
+
+        {/* Global Confirmation Popup Modal for Add, Edit, Delete */}
+        {pendingAction && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '380px', textAlign: 'center' }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+              <h3 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>Confirm Action</h3>
+              <p style={{ fontSize: '13px', color: '#475569', marginBottom: '20px', lineHeight: '1.5' }}>
+                {pendingAction.message}
               </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={executeConfirmedAction} 
+                  style={{ flex: 1, padding: '10px', background: pendingAction.type === 'DELETE' ? '#ef4444' : '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Yes, Confirm
+                </button>
+                <button 
+                  onClick={() => setPendingAction(null)} 
+                  style={{ flex: 1, padding: '10px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Main Dashboard Layout */}
-        <div className="responsive-grid">
-          
-          {/* Left Column: Form & Quick Actions */}
-          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', height: 'fit-content', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#0f172a', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>
-              {isEditing ? '✏️ Edit Candidate' : '➕ Add New Candidate'}
-            </h3>
-
-            <form onSubmit={handleFormSubmit}>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Candidate Name *</label>
-                <input type="text" placeholder="e.g. Rahul Sharma" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Email Address</label>
-                <input type="email" placeholder="rahul@email.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Phone Number</label>
-                <input type="text" placeholder="9876543210" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              {userRole === 'Partner' && (
+        {/* Batch Invoice Modal */}
+        {showInvoiceModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '450px' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', fontSize: '16px', fontWeight: '800' }}>Create Group Invoice Number</h3>
+              <form onSubmit={handleBatchInvoiceSubmit}>
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Assigned Internal HR *</label>
-                  {!isOtherSelected ? (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <select 
-                        value={formData.recruiter} 
-                        onChange={(e) => {
-                          if (e.target.value === 'OTHER') {
-                            setIsOtherSelected(true);
-                            setFormData({...formData, recruiter: ''});
-                          } else {
-                            setFormData({...formData, recruiter: e.target.value});
-                          }
-                        }}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}
-                      >
-                        <option value="">Select HR...</option>
-                        {predefinedHRs.map(hr => <option key={hr} value={hr}>{hr}</option>)}
-                        <option value="OTHER">➕ Add Other HR...</option>
-                      </select>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Enter HR name..." 
-                        value={otherRecruiterInput} 
-                        onChange={(e) => setOtherRecruiterInput(e.target.value)}
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }} 
-                      />
-                      <button type="button" onClick={() => { setIsOtherSelected(false); setOtherRecruiterInput(''); }} style={{ background: '#cbd5e1', border: 'none', padding: '0 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
-                    </div>
-                  )}
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Invoice Number *</label>
+                  <input type="text" className="modern-input" placeholder="e.g. JG/2026/045" value={batchInvoiceNumber} onChange={(e) => setBatchInvoiceNumber(e.target.value)} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
                 </div>
-              )}
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Company Name *</label>
-                <select value={formData.company_name} onChange={(e) => setFormData({...formData, company_name: e.target.value})} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
-                  <option value="">Select Company...</option>
-                  {predefinedCompanies.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Process Name *</label>
-                <input type="text" placeholder="e.g. US Voice Process" value={formData.process_name} onChange={(e) => setFormData({...formData, process_name: e.target.value})} required className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Client POC</label>
-                <input type="text" placeholder="Client HR contact person" value={formData.client_poc} onChange={(e) => setFormData({...formData, client_poc: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Selection Date</label>
-                <input type="date" value={formData.selection_date} onChange={(e) => setFormData({...formData, selection_date: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Joining Date (Optional)</label>
-                <input type="date" value={formData.joining_date} onChange={(e) => setFormData({...formData, joining_date: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              {userRole === 'Partner' && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Revenue (₹)</label>
-                  <input type="number" placeholder="e.g. 35000" value={formData.revenue} onChange={(e) => setFormData({...formData, revenue: e.target.value})} className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-                </div>
-              )}
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Candidate Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
-                  <option value="Yet to Join">Yet to Join</option>
-                  <option value="Selected">Selected</option>
-                  <option value="Joined">Joined</option>
-                  <option value="Dropped">Dropped</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '4px' }}>Remarks / Notes (Searchable)</label>
-                <textarea placeholder="Add remarks or notes..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} rows="2" className="modern-input" style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" style={{ flex: 1, padding: '10px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
-                  {isEditing ? 'Update Candidate 💾' : 'Add Candidate 🚀'}
-                </button>
-                {isEditing && (
-                  <button type="button" onClick={() => { setIsEditing(false); setFormData({ name: '', email: '', phone: '', recruiter: userRole === 'HR' ? currentLoggedInHRName : '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ background: '#cbd5e1', border: 'none', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </form>
-
-            <div style={{ marginTop: '24px', borderTop: '2px solid #f1f5f9', paddingTop: '16px' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>📁 Bulk Upload & CSV</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button type="button" onClick={downloadSampleCSV} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', color: '#334155', padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-                  📥 Download Sample CSV
-                </button>
-                <label style={{ background: '#f1f5f9', border: '1px dashed #94a3b8', padding: '10px', borderRadius: '8px', textAlign: 'center', fontSize: '11px', fontWeight: '700', cursor: 'pointer', color: '#475569' }}>
-                  📤 Upload Bulk CSV File
-                  <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Candidate Database Table & Analytics */}
-          <div className="glass-card" style={{ padding: '20px', borderRadius: '16px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-            
-            {/* Top Metric Cards */}
-            <div className="responsive-stats">
-              <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', color: '#fff', padding: '16px', borderRadius: '12px' }}>
-                <p style={{ margin: '0 0 4px 0', fontSize: '11px', opacity: 0.9, fontWeight: '600' }}>TOTAL ACTIVE REVENUE</p>
-                <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>₹ {totalRevenue.toLocaleString('en-IN')}</h3>
-              </div>
-              <div style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: '#fff', padding: '16px', borderRadius: '12px' }}>
-                <p style={{ margin: '0 0 4px 0', fontSize: '11px', opacity: 0.9, fontWeight: '600' }}>LATERAL HIRES (≥ ₹30k)</p>
-                <h3 style={{ margin: 0, fontSize: '22px', fontWeight: '800' }}>{lateralHiringCount} Candidates</h3>
-              </div>
-            </div>
-
-            {/* Filters & Search */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-              <input 
-                type="text" 
-                placeholder="🔍 Search name, phone, company, or remarks..." 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="modern-input"
-                style={{ flex: 1, minWidth: '220px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-              />
-
-              <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
-                <option value="All">All Stages</option>
-                <option value="Yet to Join">Yet to Join</option>
-                <option value="Selected">Selected</option>
-                <option value="Joined">Joined</option>
-                <option value="Dropped">Dropped</option>
-                <option value="Rejected">Rejected</option>
-              </select>
-
-              {userRole === 'Partner' && (
-                <select value={filterHR} onChange={(e) => setFilterHR(e.target.value)} style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff' }}>
-                  <option value="All">All Recruiters</option>
-                  {allRecruiters.map(hr => <option key={hr} value={hr}>{hr}</option>)}
-                </select>
-              )}
-            </div>
-
-            {/* Candidate Table */}
-            <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                    <th style={{ padding: '10px' }}>Candidate</th>
-                    <th style={{ padding: '10px' }}>Company / Process</th>
-                    <th style={{ padding: '10px' }}>Recruiter</th>
-                    <th style={{ padding: '10px' }}>Dates</th>
-                    {userRole === 'Partner' && <th style={{ padding: '10px' }}>Revenue</th>}
-                    <th style={{ padding: '10px' }}>Status</th>
-                    <th style={{ padding: '10px' }}>Invoice</th>
-                    <th style={{ padding: '10px' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCandidates.length === 0 ? (
-                    <tr>
-                      <td colSpan={userRole === 'Partner' ? 8 : 7} style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
-                        No candidates found.
-                      </td>
-                    </tr>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '5px' }}>Select Candidates (Ready to Invoice):</label>
+                <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', marginBottom: '14px', background: '#f8fafc' }}>
+                  {readyToInvoiceList.length === 0 ? (
+                    <p style={{ fontSize: '11px', color: '#64748b' }}>No candidates ready to invoice.</p>
                   ) : (
-                    filteredCandidates.map((item) => (
-                      <tr key={item.id} className="hover-effect" style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px' }}>
-                          <strong style={{ color: '#0f172a', display: 'block' }}>{item.name}</strong>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>{item.phone || item.email || 'No contact'}</span>
-                          {item.notes && <span style={{ fontSize: '10px', color: '#059669', display: 'block', fontStyle: 'italic' }}>Note: {item.notes}</span>}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span style={{ fontWeight: '600', color: '#334155' }}>{item.company_name}</span>
-                          <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{item.process_name}</span>
-                        </td>
-                        <td style={{ padding: '10px', color: '#475569', fontWeight: '500' }}>{item.recruiter}</td>
-                        <td style={{ padding: '10px', fontSize: '11px', color: '#64748b' }}>
-                          Sel: {item.selection_date || 'N/A'}<br/>
-                          Join: <span style={{ color: item.joining_date ? '#059669' : '#dc2626', fontWeight: '600' }}>{item.joining_date || 'Pending'}</span>
-                        </td>
-                        {userRole === 'Partner' && (
-                          <td style={{ padding: '10px', fontWeight: '700', color: '#0f172a' }}>₹ {parseFloat(item.revenue || 0).toLocaleString('en-IN')}</td>
-                        )}
-                        <td style={{ padding: '10px' }}>
-                          <span style={{ 
-                            padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
-                            backgroundColor: item.status === 'Joined' ? '#dcfce7' : item.status === 'Selected' ? '#e0e7ff' : '#fee2e2',
-                            color: item.status === 'Joined' ? '#166534' : item.status === 'Selected' ? '#3730a3' : '#991b1b'
-                          }}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span style={{ 
-                            padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
-                            backgroundColor: item.invoice_status === 'Paid' ? '#dcfce7' : item.invoice_status === 'Ready to Invoice' ? '#fef3c7' : '#f1f5f9',
-                            color: item.invoice_status === 'Paid' ? '#166534' : item.invoice_status === 'Ready to Invoice' ? '#b45309' : '#475569'
-                          }}>
-                            {item.invoice_status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button onClick={() => handleEditClick(item)} style={{ background: '#e0e7ff', color: '#3730a3', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
-                            <button onClick={() => handleDeleteCandidate(item, item.created_at)} style={{ background: '#fee2e2', color: '#991b1b', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>Del</button>
-                          </div>
-                        </td>
-                      </tr>
+                    readyToInvoiceList.map(cand => (
+                      <label key={cand.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '11px', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedForBatchInvoice.includes(cand.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedForBatchInvoice([...selectedForBatchInvoice, cand.id]);
+                            else setSelectedForBatchInvoice(selectedForBatchInvoice.filter(id => id !== cand.id));
+                          }}
+                        />
+                        <strong>{cand.name}</strong> ({cand.company_name}) - Rs. {parseFloat(cand.revenue || 0).toLocaleString('en-IN')}
+                      </label>
                     ))
                   )}
-                </tbody>
-              </table>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 1, padding: '10px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                    Generate & Move to Pending
+                  </button>
+                  <button type="button" onClick={() => setShowInvoiceModal(false)} style={{ padding: '10px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
             </div>
-
-            {/* Email Reporting Section */}
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              {userRole === 'HR' && (
-                <button onClick={() => {
-                  const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-                  const hrData = hrMonthlyBreakdown[currentMonthName] || { joined: 0, dropped: 0 };
-                  sendHRPerformanceEmail(currentLoggedInHRName, currentMonthName, hrData);
-                }} style={{ background: '#4f46e5', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                  📧 Send My Monthly Report to Management
-                </button>
-              )}
-              {userRole === 'Partner' && (
-                <button onClick={sendMonthlyReportEmail} style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                  📊 Send Master Monthly Report Email
-                </button>
-              )}
-            </div>
-
           </div>
-        </div>
+        )}
+
+        {/* Mark as Paid Modal */}
+        {paymentModalCandidate && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '380px' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', fontSize: '16px', fontWeight: '800' }}>Confirm Payment</h3>
+              <form onSubmit={handleMarkAsPaidSubmit}>
+                <p style={{ fontSize: '12px', color: '#475569', marginBottom: '14px' }}>Candidate: <strong style={{ color: '#0f172a' }}>{paymentModalCandidate.name}</strong></p>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Payment Date *</label>
+                  <input type="date" className="modern-input" value={paymentDateInput} onChange={(e) => setPaymentDateInput(e.target.value)} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', boxSizing: 'border-box' }} />
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Payment Mode *</label>
+                  <select className="modern-input" value={paymentModeInput} onChange={(e) => setPaymentModeInput(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', backgroundColor: '#fff', boxSizing: 'border-box' }}>
+                    <option value="NEFT">NEFT</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                    Mark as Paid
+                  </button>
+                  <button type="button" onClick={() => setPaymentModalCandidate(null)} style={{ padding: '10px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Candidate Detail Modal */}
+        {selectedCandidate && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }}>
+            <div className="animated-modal glass-card" style={{ background: '#fff', padding: '20px', borderRadius: '16px', width: '100%', maxWidth: '380px' }}>
+              <h3 style={{ marginTop: 0, color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', fontSize: '16px', fontWeight: '800' }}>Candidate Profile</h3>
+              <div style={{ fontSize: '12px', lineHeight: '1.6', color: '#334155' }}>
+                <p><strong>Name:</strong> {selectedCandidate.name}</p>
+                <p><strong>Email:</strong> {selectedCandidate.email || 'N/A'}</p>
+                <p><strong>Phone:</strong> {selectedCandidate.phone || 'N/A'}</p>
+                <p><strong>Company:</strong> {selectedCandidate.company_name || 'N/A'}</p>
+                <p><strong>Process:</strong> {selectedCandidate.process_name || 'N/A'}</p>
+                <p><strong>Internal HR:</strong> {selectedCandidate.recruiter || 'N/A'}</p>
+                <p><strong>Selection Date:</strong> {selectedCandidate.selection_date || 'N/A'}</p>
+                <p><strong>Joining Date:</strong> {selectedCandidate.joining_date || 'N/A'}</p>
+                {userRole === 'Partner' && <p><strong>Revenue:</strong> Rs. {parseFloat(selectedCandidate.revenue || 0).toLocaleString('en-IN')}</p>}
+                <p><strong>Status:</strong> {selectedCandidate.status}</p>
+                {userRole === 'Partner' && <p><strong>Invoice Status:</strong> {selectedCandidate.invoice_status}</p>}
+                {userRole === 'Partner' && selectedCandidate.invoice_number && <p><strong>Invoice Number:</strong> {selectedCandidate.invoice_number}</p>}
+                {selectedCandidate.notes && <p><strong>Notes:</strong> {selectedCandidate.notes}</p>}
+              </div>
+              <button onClick={() => setSelectedCandidate(null)} style={{ marginTop: '16px', width: '100%', padding: '10px', background: '#475569', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
-
-      {/* Confirmation Modal */}
-      {pendingAction && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '16px' }}>
-          <div className="animated-modal" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '380px', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>⚠️ Confirm Action</h3>
-            <p style={{ fontSize: '13px', color: '#475569', marginBottom: '20px' }}>{pendingAction.message}</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={executeConfirmedAction} style={{ flex: 1, background: '#4f46e5', color: '#fff', border: 'none', padding: '10px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Yes, Confirm</button>
-              <button onClick={() => setPendingAction(null)} style={{ flex: 1, background: '#cbd5e1', color: '#0f172a', border: 'none', padding: '10px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
