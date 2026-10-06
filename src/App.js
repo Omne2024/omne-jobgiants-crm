@@ -26,7 +26,7 @@ export default function App() {
   });
   
   const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey', 'Juveria'];
-  const predefinedCompanies = ['Transom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
+  const predefinedCompanies = ['Transcom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
 
   const hrDatabase = {
     'sanchi.aggarwal@jobgiants.in': { name: 'Sanchi', password: 'Sanwall@2024' },
@@ -406,7 +406,7 @@ export default function App() {
   const downloadSampleCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
-      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
+      + "Rahul Sharma,rahul@email.com,9876543210,Transcom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
       + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
@@ -450,7 +450,7 @@ export default function App() {
           name: obj.name || 'Unknown',
           email: obj.email || '',
           phone: obj.phone || '',
-          company_name: obj.company_name || 'Transom',
+          company_name: obj.company_name || 'Transcom',
           process_name: obj.process_name || 'General',
           client_poc: obj.client_poc || '',
           recruiter: rowRecruiter,
