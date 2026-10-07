@@ -113,7 +113,7 @@ export default function App() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterInvoiceStatus, filterStage, filterHR]);
+  }, [searchTerm, filterInvoiceStatus, filterStage, filterHR, selectedRevenueMonth]);
 
   useEffect(() => {
     if (!showWelcome) return;
@@ -708,8 +708,9 @@ export default function App() {
     const matchesStatus = filterInvoiceStatus === 'All' || item.invoice_status === filterInvoiceStatus;
     const matchesStage = filterStage === 'All' || item.status === filterStage;
     const matchesHR = userRole === 'HR' ? item.recruiter === currentLoggedInHRName : (filterHR === 'All' || item.recruiter === filterHR);
+    const matchesMonth = selectedRevenueMonth === 'All' || getRevenueMonthKey(item) === selectedRevenueMonth;
 
-    return matchesSearch && matchesStatus && matchesStage && matchesHR;
+    return matchesSearch && matchesStatus && matchesStage && matchesHR && matchesMonth;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / ITEMS_PER_PAGE));
