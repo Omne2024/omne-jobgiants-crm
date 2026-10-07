@@ -6,6 +6,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_Iznkoy_uNvS3-dqziX6KYQ_tKS6mvb0';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Company logo shown to every user by default (login page, navbar, welcome screen, watermark).
+// To change it for everyone, replace this one link (or use '/logo.png' after placing logo.png in the public folder).
+const COMPANY_LOGO_URL = 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState('Partner'); 
@@ -21,12 +25,10 @@ export default function App() {
   // Confirmation Modal State for Add, Edit, Delete
   const [pendingAction, setPendingAction] = useState(null); // { type: 'ADD' | 'EDIT' | 'DELETE', data: ..., message: '...' }
 
-  const [companyLogo, setCompanyLogo] = useState(() => {
-    return localStorage.getItem('crm_custom_logo') || 'https://www.jobgiants.in/wp-content/uploads/2023/10/cropped-Logo-1.png';
-  });
+  const companyLogo = COMPANY_LOGO_URL;
   
   const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey', 'Juveria'];
-  const predefinedCompanies = ['Transom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
+  const predefinedCompanies = ['Transcom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
 
   const hrDatabase = {
     'sanchi.aggarwal@jobgiants.in': { name: 'Sanchi', password: 'Sanwall@2024' },
@@ -113,7 +115,7 @@ export default function App() {
 
   useEffect(() => {
     if (!showWelcome) return;
-    const timer = setTimeout(() => setShowWelcome(false), 2200);
+    const timer = setTimeout(() => setShowWelcome(false), 10000);
     return () => clearTimeout(timer);
   }, [showWelcome]);
 
@@ -148,20 +150,6 @@ export default function App() {
         alert('Invalid Credentials');
       }
     }
-  };
-
-  const handleLogoUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64Image = event.target.result;
-      setCompanyLogo(base64Image);
-      localStorage.setItem('crm_custom_logo', base64Image);
-      alert("Logo successfully updated!");
-    };
-    reader.readAsDataURL(file);
   };
 
   const fetchCandidates = async () => {
@@ -513,7 +501,7 @@ export default function App() {
   const downloadSampleCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
-      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
+      + "Rahul Sharma,rahul@email.com,9876543210,Transcom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
       + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
@@ -557,13 +545,13 @@ export default function App() {
           name: obj.name || 'Unknown',
           email: obj.email || '',
           phone: obj.phone || '',
-          company_name: obj.company_name || 'Transom',
+          company_name: obj.company_name || 'Transcom',
           process_name: obj.process_name || 'General',
           client_poc: obj.client_poc || '',
           recruiter: rowRecruiter,
           selection_date: obj.selection_date || null,
           joining_date: obj.joining_date || null,
-          revenue: userRole === 'HR' ? (calculateAutoRevenue(obj.company_name || 'Transom', null) || 0) : (obj.revenue || calculateAutoRevenue(obj.company_name || 'Transom', obj.ctc) || 0),
+          revenue: userRole === 'HR' ? (calculateAutoRevenue(obj.company_name || 'Transcom', null) || 0) : (obj.revenue || calculateAutoRevenue(obj.company_name || 'Transcom', obj.ctc) || 0),
           ctc: parseFloat(obj.ctc) || null,
           status: statusVal,
           invoice_status: invStatus,
@@ -890,7 +878,7 @@ export default function App() {
           </p>
 
           <div style={{ margin: '26px auto 0 auto', width: '160px', height: '4px', borderRadius: '4px', background: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: '4px', background: 'linear-gradient(90deg, #fde68a, #f472b6)', animation: 'welcomeBar 7s linear forwards' }} />
+            <div style={{ height: '100%', borderRadius: '4px', background: 'linear-gradient(90deg, #fde68a, #f472b6)', animation: 'welcomeBar 10s linear forwards' }} />
           </div>
           <p style={{ margin: '10px 0 0 0', fontSize: '11px', color: '#c7d2fe', opacity: 0.8 }}>Setting up your workspace...</p>
         </div>
@@ -990,11 +978,6 @@ export default function App() {
                 <label style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'inline-block' }}>
                   📂 Bulk Upload
                   <input type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
-                </label>
-
-                <label style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '7px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
-                  🖼 Logo
-                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
                 </label>
 
                 <div style={{ display: 'flex', background: '#e2e8f0', padding: '2px', borderRadius: '8px', gap: '2px' }}>
