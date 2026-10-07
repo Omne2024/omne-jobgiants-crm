@@ -1248,15 +1248,19 @@ export default function App() {
               <div className="glass-card" style={{ padding: '16px', borderRadius: '16px', marginBottom: '20px', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>📊 Your Performance Summary</h3>
                 {(() => {
-                  let calcTotal = 0, calcSelected = 0, calcJoined = 0, calcDropped = 0, calcRejected = 0;
+                  let calcTotal = 0, calcYetToJoin = 0, calcSelected = 0, calcJoined = 0, calcDropped = 0, calcRejected = 0;
                   Object.values(hrMonthlyBreakdown).forEach(val => {
-                    calcTotal += val.total; calcSelected += val.selected; calcJoined += val.joined; calcDropped += val.dropped; calcRejected += val.rejected;
+                    calcTotal += val.total; calcYetToJoin += val.yetToJoin; calcSelected += val.selected; calcJoined += val.joined; calcDropped += val.dropped; calcRejected += val.rejected;
                   });
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
                       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
                         <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Total Handled</span>
                         <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#0f172a' }}>{calcTotal}</p>
+                      </div>
+                      <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '10px', color: '#6d28d9', fontWeight: '700', textTransform: 'uppercase' }}>Yet to Join</span>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '18px', fontWeight: '800', color: '#5b21b6' }}>{calcYetToJoin}</p>
                       </div>
                       <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
                         <span style={{ fontSize: '10px', color: '#1d4ed8', fontWeight: '700', textTransform: 'uppercase' }}>Selected</span>
