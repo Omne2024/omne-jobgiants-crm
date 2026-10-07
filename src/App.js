@@ -26,7 +26,7 @@ export default function App() {
   });
   
   const predefinedHRs = ['Sanchi', 'Sadaf', 'Anjali', 'Shrey', 'Juveria'];
-  const predefinedCompanies = ['Transcom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
+  const predefinedCompanies = ['Transom', 'HGS', 'iQor', 'Atain', 'Vertex Group', 'Shaadi.com', 'iEnergizer'];
 
   const hrDatabase = {
     'sanchi.aggarwal@jobgiants.in': { name: 'Sanchi', password: 'Sanwall@2024' },
@@ -36,6 +36,10 @@ export default function App() {
   };
 
   const partnerEmails = ['suraj.jha@jobgiants.in', 'garimabansal@jobgiants.in'];
+  const partnerNames = {
+    'suraj.jha@jobgiants.in': 'Suraj',
+    'garimabansal@jobgiants.in': 'Garima'
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -53,7 +57,7 @@ export default function App() {
     invoice_number: '',
     payment_date: '',
     payment_mode: 'NEFT',
-    notes: ''
+    notes: '', ctc: ''
   });
 
   const [otherRecruiterInput, setOtherRecruiterInput] = useState('');
@@ -84,9 +88,19 @@ export default function App() {
   // Month filter for Active Revenue Pipeline card
   const [selectedRevenueMonth, setSelectedRevenueMonth] = useState('All');
 
+  // Client companies (fee rules) and HR targets loaded from Supabase
+  const [companiesList, setCompaniesList] = useState([]);
+  const [targets, setTargets] = useState([]);
+
+  // Welcome splash screen shown for a couple of seconds right after login
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeName, setWelcomeName] = useState('');
+
   useEffect(() => {
     if (isLoggedIn) {
       fetchCandidates();
+      fetchCompanies();
+      fetchTargets();
       if (userRole === 'Partner') {
         fetchAuditLogs();
       }
@@ -96,6 +110,12 @@ export default function App() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterInvoiceStatus, filterStage, filterHR]);
+
+  useEffect(() => {
+    if (!showWelcome) return;
+    const timer = setTimeout(() => setShowWelcome(false), 2200);
+    return () => clearTimeout(timer);
+  }, [showWelcome]);
 
   useEffect(() => {
     if (isLoggedIn && userRole === 'Partner' && activeTab === 'audit') {
@@ -110,6 +130,8 @@ export default function App() {
     if (selectedRoleType === 'Partner') {
       if (partnerEmails.includes(cleanEmail) && loginPassword === 'Inteca@1100145') {
         setUserRole('Partner');
+        setWelcomeName(partnerNames[cleanEmail] || 'Partner');
+        setShowWelcome(true);
         setIsLoggedIn(true);
       } else {
         alert('Invalid Credentials');
@@ -118,6 +140,8 @@ export default function App() {
       const hrRecord = hrDatabase[cleanEmail];
       if (hrRecord && hrRecord.password === loginPassword) {
         setUserRole('HR');
+        setWelcomeName(hrRecord.name);
+        setShowWelcome(true);
         setIsLoggedIn(true);
         setFormData(prev => ({ ...prev, recruiter: hrRecord.name }));
       } else {
@@ -141,11 +165,16 @@ export default function App() {
   };
 
   const fetchCandidates = async () => {
-    let query = supabase.from('candidates').select('*');
-    const { data, error } = await query.order('joining_date', { ascending: false });
+    let { data, error } = await supabase.from('candidates').select('*').is('deleted_at', null).order('joining_date', { ascending: false });
 
     if (error) {
-      console.error("Fetch Error:", error);
+      console.error("Fetch Error (retrying without soft-delete filter):", error);
+      const fallback = await supabase.from('candidates').select('*').order('joining_date', { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+      if (error) {
+        console.error("Fetch Error:", error);
+      }
     }
 
     if (data) {
@@ -183,6 +212,68 @@ export default function App() {
     }
   };
 
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase.from('companies').select('*').eq('is_active', true).order('name', { ascending: true });
+    if (error) {
+      console.error("Companies Fetch Error:", error);
+      return;
+    }
+    if (data) {
+      setCompaniesList(data);
+    }
+  };
+
+  const fetchTargets = async () => {
+    const { data, error } = await supabase.from('hr_targets').select('*');
+    if (error) {
+      console.error("Targets Fetch Error:", error);
+      return;
+    }
+    if (data) {
+      setTargets(data);
+    }
+  };
+
+  // Returns the company's fee rule only if a fee type and value are set
+  const getCompanyRule = (companyName) => {
+    return companiesList.find(c => c.name === companyName && c.fee_type && c.fee_value !== null && c.fee_value !== undefined);
+  };
+
+  // Auto revenue: fixed fee per candidate, or percentage of annual CTC
+  const calculateAutoRevenue = (companyName, ctcValue) => {
+    const rule = getCompanyRule(companyName);
+    if (!rule) return null;
+    const fee = parseFloat(rule.fee_value);
+    if (isNaN(fee)) return null;
+    if (rule.fee_type === 'fixed') return fee;
+    if (rule.fee_type === 'percentage') {
+      const ctc = parseFloat(ctcValue);
+      if (!ctc || isNaN(ctc)) return null;
+      return Math.round((ctc * fee) / 100);
+    }
+    return null;
+  };
+
+  const handleCompanyChange = (companyName) => {
+    setFormData(prev => {
+      const next = { ...prev, company_name: companyName };
+      if (userRole === 'Partner') {
+        const auto = calculateAutoRevenue(companyName, prev.ctc);
+        if (auto !== null) next.revenue = String(auto);
+      }
+      return next;
+    });
+  };
+
+  const handleCtcChange = (value) => {
+    setFormData(prev => {
+      const next = { ...prev, ctc: value };
+      const auto = calculateAutoRevenue(prev.company_name, value);
+      if (auto !== null) next.revenue = String(auto);
+      return next;
+    });
+  };
+
   // Step 1: Trigger Form Confirmation Popup before Add/Edit
   const handleFormSubmit = (e) => {
     e.preventDefault();
@@ -215,7 +306,8 @@ export default function App() {
       joining_date: cleanJoiningDate,
       recruiter: finalRecruiter,
       status: formData.status,
-      revenue: userRole === 'HR' ? 0 : (parseFloat(formData.revenue) || 0),
+      revenue: userRole === 'HR' ? (isEditing ? (parseFloat(formData.revenue) || 0) : (calculateAutoRevenue(formData.company_name, null) || 0)) : (parseFloat(formData.revenue) || 0),
+      ctc: parseFloat(formData.ctc) || null,
       invoice_status: updatedInvoiceStatus,
       invoice_number: formData.invoice_number || '',
       payment_date: cleanPaymentDate,
@@ -223,10 +315,25 @@ export default function App() {
       notes: formData.notes || ''
     };
 
+    // Duplicate check (same phone or email on any existing candidate)
+    const normalizePhone = (v) => (v || '').toString().replace(/\D/g, '').slice(-10);
+    const newPhone = normalizePhone(formData.phone);
+    const newEmail = (formData.email || '').trim().toLowerCase();
+    const duplicate = candidates.find(c => {
+      if (isEditing && c.id === currentId) return false;
+      const samePhone = newPhone && normalizePhone(c.phone) === newPhone;
+      const sameEmail = newEmail && (c.email || '').trim().toLowerCase() === newEmail;
+      return samePhone || sameEmail;
+    });
+
     const actionType = isEditing ? 'EDIT' : 'ADD';
-    const message = isEditing 
+    let message = isEditing 
       ? `Are you sure you want to update the details for candidate "${formData.name}"?` 
       : `Are you sure you want to add candidate "${formData.name}"?`;
+
+    if (duplicate) {
+      message += `\n\n⚠️ Duplicate warning: "${duplicate.name}" (${duplicate.company_name || 'N/A'}, HR: ${duplicate.recruiter}) already exists with the same phone/email. Do you still want to continue?`;
+    }
 
     setPendingAction({
       type: actionType,
@@ -274,7 +381,7 @@ export default function App() {
           name: '', email: '', phone: '', recruiter: userRole === 'HR' ? (hrDatabase[loginEmail.trim().toLowerCase()]?.name) : '', 
           company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', 
           revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', 
-          payment_date: '', payment_mode: 'NEFT', notes: ''
+          payment_date: '', payment_mode: 'NEFT', notes: '', ctc: ''
         });
         setIsOtherSelected(false);
         setOtherRecruiterInput('');
@@ -284,7 +391,7 @@ export default function App() {
       }
     } else if (type === 'DELETE') {
       const candidate = pendingAction.candidate;
-      const { error } = await supabase.from('candidates').delete().eq('id', candidate.id);
+      const { error } = await supabase.from('candidates').update({ deleted_at: new Date().toISOString(), deleted_by: loginEmail.trim().toLowerCase() }).eq('id', candidate.id);
       if (error) {
         alert("Failed to delete: " + error.message);
       } else {
@@ -406,7 +513,7 @@ export default function App() {
   const downloadSampleCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "name,email,phone,company_name,process_name,client_poc,recruiter,selection_date,joining_date,revenue,status,notes\n"
-      + "Rahul Sharma,rahul@email.com,9876543210,Transcom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
+      + "Rahul Sharma,rahul@email.com,9876543210,Transom,US Voice,Mr. Ramesh,Sanchi,2026-10-01,2026-10-15,35000,Joined,Joining confirmed\n"
       + "Priya Singh,priya@email.com,9123456789,HGS,Backend,Ms. Pooja,Sadaf,2026-10-05,2026-10-20,25000,Yet to Join,Called on Monday";
     
     const encodedUri = encodeURI(csvContent);
@@ -450,13 +557,14 @@ export default function App() {
           name: obj.name || 'Unknown',
           email: obj.email || '',
           phone: obj.phone || '',
-          company_name: obj.company_name || 'Transcom',
+          company_name: obj.company_name || 'Transom',
           process_name: obj.process_name || 'General',
           client_poc: obj.client_poc || '',
           recruiter: rowRecruiter,
           selection_date: obj.selection_date || null,
           joining_date: obj.joining_date || null,
-          revenue: userRole === 'HR' ? 0 : (obj.revenue || 0),
+          revenue: userRole === 'HR' ? (calculateAutoRevenue(obj.company_name || 'Transom', null) || 0) : (obj.revenue || calculateAutoRevenue(obj.company_name || 'Transom', obj.ctc) || 0),
+          ctc: parseFloat(obj.ctc) || null,
           status: statusVal,
           invoice_status: invStatus,
           notes: obj.notes || ''
@@ -555,6 +663,7 @@ export default function App() {
   };
 
   const allRecruiters = Array.from(new Set([...predefinedHRs, ...candidates.map(item => item.recruiter)])).filter(Boolean);
+  const companyOptions = Array.from(new Set([...predefinedCompanies, ...companiesList.map(c => c.name)]));
   const readyToInvoiceList = candidates.filter(item => item.invoice_status === 'Ready to Invoice');
   const pendingInvoicesList = candidates.filter(item => item.invoice_status === 'Invoice Raised / Pending Clearance');
 
@@ -563,6 +672,14 @@ export default function App() {
     if (!dateToUse) return null;
     const dateObj = new Date(dateToUse);
     return isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
+  const getMonthStart = (dateObj) => {
+    return isNaN(dateObj) ? 'Unknown' : `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const getTarget = (hrName, monthStart) => {
+    return targets.find(t => (t.hr_name || '').trim().toLowerCase() === (hrName || '').trim().toLowerCase() && t.month === monthStart);
   };
 
   const revenueMonthOptions = Array.from(
@@ -619,7 +736,7 @@ export default function App() {
 
     if (!hrMonthlyBreakdown[monthKey]) {
       hrMonthlyBreakdown[monthKey] = {
-        total: 0, selected: 0, joined: 0, dropped: 0, rejected: 0, yetToJoin: 0, candidates: []
+        total: 0, selected: 0, joined: 0, dropped: 0, rejected: 0, yetToJoin: 0, candidates: [], monthStart: getMonthStart(dateObj)
       };
     }
 
@@ -641,7 +758,7 @@ export default function App() {
     const monthKey = isNaN(dateObj) ? 'Unknown' : dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     if (!monthlyData[monthKey]) {
-      monthlyData[monthKey] = { totalRevenue: 0, joinedCount: 0, droppedCount: 0, recruiters: {} };
+      monthlyData[monthKey] = { totalRevenue: 0, joinedCount: 0, droppedCount: 0, recruiters: {}, monthStart: getMonthStart(dateObj) };
     }
 
     const rev = parseFloat(item.revenue) || 0;
@@ -714,6 +831,68 @@ export default function App() {
               Login to Portal 🚀
             </button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (showWelcome) {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    const greetingIcon = hour < 12 ? '☀️' : hour < 17 ? '🌤️' : '🌙';
+
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden', background: 'linear-gradient(135deg, #1e1b4b 0%, #4338ca 45%, #7c3aed 100%)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontFamily: 'Inter, system-ui, sans-serif', zIndex: 5000, padding: '16px', boxSizing: 'border-box' }}>
+        <style>{`
+          @keyframes welcomeFadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes welcomePop { 0% { opacity: 0; transform: scale(0.6); } 70% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+          @keyframes welcomeFloat { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-18px) rotate(6deg); } }
+          @keyframes welcomeRing { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.45); } 100% { box-shadow: 0 0 0 28px rgba(255,255,255,0); } }
+          @keyframes welcomeShimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+          @keyframes welcomeBar { from { width: 0%; } to { width: 100%; } }
+          @keyframes welcomeBlob { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+        `}</style>
+
+        {/* Soft glowing background blobs */}
+        <div style={{ position: 'absolute', top: '-120px', left: '-100px', width: '380px', height: '380px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.45)', filter: 'blur(70px)', animation: 'welcomeBlob 4s ease-in-out infinite' }} />
+        <div style={{ position: 'absolute', bottom: '-140px', right: '-100px', width: '420px', height: '420px', borderRadius: '50%', background: 'rgba(168, 85, 247, 0.45)', filter: 'blur(80px)', animation: 'welcomeBlob 5s ease-in-out infinite' }} />
+
+        {/* Floating recruitment icons */}
+        <div style={{ position: 'absolute', top: '12%', left: '10%', fontSize: '38px', opacity: 0.25, animation: 'welcomeFloat 4s ease-in-out infinite' }}>💼</div>
+        <div style={{ position: 'absolute', top: '20%', right: '12%', fontSize: '34px', opacity: 0.25, animation: 'welcomeFloat 5s ease-in-out infinite' }}>🎯</div>
+        <div style={{ position: 'absolute', bottom: '16%', left: '14%', fontSize: '36px', opacity: 0.25, animation: 'welcomeFloat 4.5s ease-in-out infinite' }}>🤝</div>
+        <div style={{ position: 'absolute', bottom: '22%', right: '10%', fontSize: '34px', opacity: 0.25, animation: 'welcomeFloat 5.5s ease-in-out infinite' }}>📈</div>
+
+        {/* Center content */}
+        <div style={{ position: 'relative', textAlign: 'center', color: '#fff', maxWidth: '440px', width: '100%' }}>
+          <div style={{ display: 'inline-block', padding: '5px', borderRadius: '50%', background: 'linear-gradient(135deg, #fde68a 0%, #f472b6 50%, #818cf8 100%)', animation: 'welcomePop 0.7s ease-out forwards, welcomeRing 1.6s ease-out infinite' }}>
+            <img src={companyLogo} alt="Logo" style={{ width: '84px', height: '84px', objectFit: 'contain', borderRadius: '50%', backgroundColor: '#fff', display: 'block' }} />
+          </div>
+
+          <p style={{ margin: '22px 0 4px 0', fontSize: '13px', fontWeight: '600', letterSpacing: '0.12em', opacity: 0, color: '#c7d2fe', animation: 'welcomeFadeUp 0.6s ease-out 0.25s forwards' }}>
+            {greetingIcon} {greeting.toUpperCase()}
+          </p>
+
+          <h1 style={{ margin: 0, fontSize: 'clamp(30px, 8vw, 46px)', fontWeight: '800', letterSpacing: '-0.02em', opacity: 0, animation: 'welcomeFadeUp 0.6s ease-out 0.4s forwards' }}>
+            Welcome,
+          </h1>
+
+          <h1 style={{ margin: '2px 0 0 0', fontSize: 'clamp(36px, 10vw, 58px)', fontWeight: '900', letterSpacing: '-0.02em', opacity: 0, background: 'linear-gradient(90deg, #fde68a, #ffffff, #c4b5fd, #fde68a)', backgroundSize: '200% auto', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'welcomeFadeUp 0.6s ease-out 0.55s forwards, welcomeShimmer 2.5s linear infinite' }}>
+            {welcomeName}
+          </h1>
+
+          <div style={{ display: 'inline-block', marginTop: '16px', padding: '6px 16px', borderRadius: '20px', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '700', opacity: 0, animation: 'welcomeFadeUp 0.6s ease-out 0.7s forwards' }}>
+            {userRole === 'Partner' ? '👑 Partner / Management' : '🤝 Internal HR Team'}
+          </div>
+
+          <p style={{ margin: '18px 0 0 0', fontSize: '14px', color: '#e0e7ff', lineHeight: '1.6', opacity: 0, animation: 'welcomeFadeUp 0.6s ease-out 0.85s forwards' }}>
+            Omne JobGiants • Connecting talent with opportunity ✨
+          </p>
+
+          <div style={{ margin: '26px auto 0 auto', width: '160px', height: '4px', borderRadius: '4px', background: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', borderRadius: '4px', background: 'linear-gradient(90deg, #fde68a, #f472b6)', animation: 'welcomeBar 2.2s linear forwards' }} />
+          </div>
+          <p style={{ margin: '10px 0 0 0', fontSize: '11px', color: '#c7d2fe', opacity: 0.8 }}>Setting up your workspace...</p>
         </div>
       </div>
     );
@@ -844,7 +1023,7 @@ export default function App() {
               </>
             )}
 
-            <button onClick={() => setIsLoggedIn(false)} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+            <button onClick={() => { setIsLoggedIn(false); setShowWelcome(false); }} style={{ background: '#64748b', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
               🔒 Logout
             </button>
           </div>
@@ -940,6 +1119,13 @@ export default function App() {
                             <span style={{ background: '#d1fae5', color: '#065f46', padding: '4px 8px', borderRadius: '6px' }}>Joined: {mData.joined}</span>
                             <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 8px', borderRadius: '6px' }}>Dropped: {mData.dropped}</span>
                             <span style={{ background: '#fee2e2', color: '#991b1b', padding: '4px 8px', borderRadius: '6px' }}>Rejected: {mData.rejected}</span>
+                            {(() => {
+                              const t = getTarget(currentLoggedInHRName, mData.monthStart);
+                              if (!t || !t.target_joinings) return null;
+                              return (
+                                <span style={{ background: '#eef2ff', color: '#3730a3', padding: '4px 8px', borderRadius: '6px' }}>🎯 Target: {mData.joined + mData.selected}/{t.target_joinings}</span>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -1015,6 +1201,18 @@ export default function App() {
                                     <span>Joined/Selected: <strong>{hrStats.joined}</strong></span>
                                     <span>Dropped: <strong style={{ color: '#ef4444' }}>{hrStats.dropped}</strong></span>
                                   </div>
+
+                                  {(() => {
+                                    const t = getTarget(hrName, mData.monthStart);
+                                    if (!t) return null;
+                                    const joinPct = t.target_joinings ? Math.round((hrStats.joined / t.target_joinings) * 100) : null;
+                                    const revPct = t.target_revenue ? Math.round((hrStats.revenue / t.target_revenue) * 100) : null;
+                                    return (
+                                      <div style={{ fontSize: '10px', color: '#4f46e5', fontWeight: '700', background: '#eef2ff', padding: '4px 8px', borderRadius: '6px', marginBottom: '8px' }}>
+                                        🎯 Target:{t.target_joinings ? ` ${t.target_joinings} joinings (${joinPct}%)` : ''}{t.target_revenue ? ` • Rs. ${Number(t.target_revenue).toLocaleString('en-IN')} (${revPct}%)` : ''}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
 
                                 {hasEmailRegistered ? (
@@ -1125,12 +1323,12 @@ export default function App() {
                     <select 
                       className="modern-input"
                       value={formData.company_name} 
-                      onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} 
+                      onChange={(e) => handleCompanyChange(e.target.value)} 
                       required 
                       style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', backgroundColor: '#fff', fontSize: '12px' }}
                     >
                       <option value="" disabled>-- Select Client Company --</option>
-                      {predefinedCompanies.map(comp => <option key={comp} value={comp}>{comp}</option>)}
+                      {companyOptions.map(comp => <option key={comp} value={comp}>{comp}</option>)}
                     </select>
                   </div>
 
@@ -1182,6 +1380,13 @@ export default function App() {
                     <input type="date" className="modern-input" value={formData.joining_date} onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })} required style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
                   </div>
 
+                  {userRole === 'Partner' && getCompanyRule(formData.company_name)?.fee_type === 'percentage' && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Candidate Annual CTC (INR)</label>
+                      <input type="number" className="modern-input" placeholder="e.g. 300000" value={formData.ctc ?? ''} onChange={(e) => handleCtcChange(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '12px' }} />
+                    </div>
+                  )}
+
                   {userRole === 'Partner' && (
                     <div style={{ marginBottom: '10px' }}>
                       <label style={{ fontSize: '11px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>Revenue (INR) *</label>
@@ -1214,7 +1419,7 @@ export default function App() {
                       {userRole === 'HR' ? (isEditing ? 'Update Entry 🚀' : 'Submit Entry 🚀') : (isEditing ? 'Update Candidate' : 'Save Candidate')}
                     </button>
                     {isEditing && (
-                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '' }); }} style={{ padding: '9px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
+                      <button type="button" onClick={() => { setIsEditing(false); setCurrentId(null); setIsOtherSelected(false); setFormData({ name: '', email: '', phone: '', recruiter: '', company_name: '', process_name: '', client_poc: '', selection_date: '', joining_date: '', revenue: '', status: 'Yet to Join', invoice_status: 'Pending', invoice_number: '', payment_date: '', payment_mode: 'NEFT', notes: '', ctc: '' }); }} style={{ padding: '9px 12px', background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
                         Cancel
                       </button>
                     )}
@@ -1408,7 +1613,7 @@ export default function App() {
             <div className="animated-modal glass-card" style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '100%', maxWidth: '380px', textAlign: 'center' }}>
               <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
               <h3 style={{ margin: '0 0 10px 0', color: '#0f172a', fontSize: '16px', fontWeight: '800' }}>Confirm Action</h3>
-              <p style={{ fontSize: '13px', color: '#475569', marginBottom: '20px', lineHeight: '1.5' }}>
+              <p style={{ fontSize: '13px', color: '#475569', marginBottom: '20px', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
                 {pendingAction.message}
               </p>
               <div style={{ display: 'flex', gap: '10px' }}>
