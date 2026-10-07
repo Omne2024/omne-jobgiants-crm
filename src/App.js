@@ -890,7 +890,7 @@ export default function App() {
           </p>
 
           <div style={{ margin: '26px auto 0 auto', width: '160px', height: '4px', borderRadius: '4px', background: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: '4px', background: 'linear-gradient(90deg, #fde68a, #f472b6)', animation: 'welcomeBar 2.2s linear forwards' }} />
+            <div style={{ height: '100%', borderRadius: '4px', background: 'linear-gradient(90deg, #fde68a, #f472b6)', animation: 'welcomeBar 4s linear forwards' }} />
           </div>
           <p style={{ margin: '10px 0 0 0', fontSize: '11px', color: '#c7d2fe', opacity: 0.8 }}>Setting up your workspace...</p>
         </div>
