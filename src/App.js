@@ -44,6 +44,38 @@ const EMPTY_JD_FORM = {
 
 const getExperienceBucket = (lead) => (lead.experience_type === 'Fresher' ? 'Fresher' : (lead.total_experience || 'Experienced'));
 
+// Higher number = more experienced / more qualified
+const EXPERIENCE_RANK = { 'Fresher': 0, '0 - 6 months': 1, '6 months to 1 year': 2, '1 year to 2 years': 3, '2 years & above': 4 };
+const QUALIFICATION_RANK = {
+  '12th (Higher Secondary / Intermediate)': 0,
+  "UG (Undergraduate - Bachelor's Degree)": 1,
+  "PG (Postgraduate - Master's Degree)": 2
+};
+const lowestOf = (list, rankMap) => {
+  const valid = (list || []).filter(x => x in rankMap);
+  if (valid.length === 0) return '';
+  return valid.reduce((a, b) => (rankMap[b] < rankMap[a] ? b : a));
+};
+const highestOf = (list, rankMap) => {
+  const valid = (list || []).filter(x => x in rankMap);
+  if (valid.length === 0) return '';
+  return valid.reduce((a, b) => (rankMap[b] > rankMap[a] ? b : a));
+};
+const getLeadExperienceRank = (lead) => {
+  const r = EXPERIENCE_RANK[getExperienceBucket(lead)];
+  return r === undefined ? 1 : r;
+};
+
+// Small notes shown on a candidate when he is MORE experienced / qualified than the JD asks
+const getOverNotes = (lead, jd) => {
+  const notes = [];
+  const maxExp = highestOf(jd.experience_levels, EXPERIENCE_RANK);
+  if (maxExp && getLeadExperienceRank(lead) > EXPERIENCE_RANK[maxExp]) notes.push('More experienced than asked');
+  const maxQual = highestOf(jd.qualifications, QUALIFICATION_RANK);
+  if (maxQual && (QUALIFICATION_RANK[lead.highest_qualification] ?? -1) > QUALIFICATION_RANK[maxQual]) notes.push('Higher qualification than asked');
+  return notes;
+};
+
 const onlyDigits = (v) => (v || '').toString().replace(/\D/g, '').slice(-10);
 
 // Decides whether a candidate (lead) is relevant for a Job Description.
@@ -58,8 +90,12 @@ const leadMatchesJD = (lead, jd) => {
   }
   if (jd.job_role === 'Sales' && jd.sales_type && lead.sales_type && lead.sales_type !== jd.sales_type) return false;
 
-  if ((jd.experience_levels || []).length > 0 && !jd.experience_levels.includes(getExperienceBucket(lead))) return false;
-  if ((jd.qualifications || []).length > 0 && !jd.qualifications.includes(lead.highest_qualification)) return false;
+  // Experience / qualification in a JD are treated as MINIMUM requirements:
+  // a candidate with the same or more experience / qualification is eligible.
+  const minExp = lowestOf(jd.experience_levels, EXPERIENCE_RANK);
+  if (minExp && getLeadExperienceRank(lead) < EXPERIENCE_RANK[minExp]) return false;
+  const minQual = lowestOf(jd.qualifications, QUALIFICATION_RANK);
+  if (minQual && (QUALIFICATION_RANK[lead.highest_qualification] ?? -1) < QUALIFICATION_RANK[minQual]) return false;
 
   if ((jd.locations || []).length > 0) {
     const relocate = (lead.relocate_cities || []).map(c => c.toLowerCase());
@@ -276,6 +312,7 @@ function JobsPanel({ userRole, userName, companyOptions }) {
             <div>🧩 {lead.job_role === 'Others' ? (lead.role_other || 'Others') : lead.job_role}{lead.support_type ? ` • ${lead.support_type}` : ''}{lead.sales_type ? ` • ${lead.sales_type}` : ''}</div>
             <div>📍 {lead.current_location}{(lead.relocate_cities || []).length > 0 ? ` • Open to: ${lead.relocate_cities.join(', ')}` : ''}</div>
             <div style={{ color: '#94a3b8', fontSize: '10px' }}>Submitted {formatDate(lead.created_at)}{lead.source ? ` • via ${lead.source}` : ''}</div>
+            {getOverNotes(lead, jd).map(n => <span key={n} style={chip('#ecfdf5', '#047857')}>⭐ {n}</span>)}
           </div>
           {lead.description && (
             <details style={{ marginTop: '6px', fontSize: '11px', color: '#475569' }}>
@@ -430,24 +467,20 @@ function JobsPanel({ userRole, userName, companyOptions }) {
               <input className="modern-input" type="text" placeholder="Other locations (comma separated)" value={jdForm.other_locations} onChange={(e) => setJdForm({ ...jdForm, other_locations: e.target.value })} style={{ ...inputStyle, marginTop: '6px' }} />
             </div>
             <div>
-              <label style={labelStyle}>Experience accepted (leave empty = any)</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                {EXPERIENCE_LEVELS.map(x => (
-                  <label key={x} style={{ fontSize: '12px', color: '#334155', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={jdForm.experience_levels.includes(x)} onChange={() => toggleFormArray('experience_levels', x)} /> {x}
-                  </label>
-                ))}
-              </div>
+              <label style={labelStyle}>Minimum experience</label>
+              <select className="modern-input" value={lowestOf(jdForm.experience_levels, EXPERIENCE_RANK)} onChange={(e) => setJdForm({ ...jdForm, experience_levels: e.target.value ? [e.target.value] : [] })} style={inputStyle}>
+                <option value="">Any (freshers also)</option>
+                {EXPERIENCE_LEVELS.filter(x => x !== 'Fresher').map(x => <option key={x} value={x}>{x} or more</option>)}
+              </select>
+              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '3px' }}>More experienced candidates are shown too.</div>
             </div>
             <div>
-              <label style={labelStyle}>Qualification accepted (leave empty = any)</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                {QUALIFICATION_OPTIONS.map(x => (
-                  <label key={x} style={{ fontSize: '12px', color: '#334155', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={jdForm.qualifications.includes(x)} onChange={() => toggleFormArray('qualifications', x)} /> {x}
-                  </label>
-                ))}
-              </div>
+              <label style={labelStyle}>Minimum qualification</label>
+              <select className="modern-input" value={lowestOf(jdForm.qualifications, QUALIFICATION_RANK)} onChange={(e) => setJdForm({ ...jdForm, qualifications: e.target.value ? [e.target.value] : [] })} style={inputStyle}>
+                <option value="">Any</option>
+                {QUALIFICATION_OPTIONS.map(x => <option key={x} value={x}>{x} or higher</option>)}
+              </select>
+              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '3px' }}>Higher qualified candidates are shown too.</div>
             </div>
           </div>
 
@@ -492,7 +525,8 @@ function JobsPanel({ userRole, userName, companyOptions }) {
                       {jd.company_name && <span style={chip('#e0e7ff', '#3730a3')}>🏢 {jd.company_name}</span>}
                       <span style={chip('#d1fae5', '#065f46')}>{jd.job_role === 'Others' ? (jd.role_other || 'Others') : jd.job_role}{jd.support_type ? ` • ${jd.support_type}` : ''}{jd.sales_type ? ` • ${jd.sales_type}` : ''}</span>
                       {(jd.locations || []).length > 0 && <span style={chip('#fef3c7', '#92400e')}>📍 {jd.locations.join(', ')}</span>}
-                      {(jd.experience_levels || []).length > 0 && <span style={chip('#f1f5f9', '#334155')}>Exp: {jd.experience_levels.join(' / ')}</span>}
+                      {lowestOf(jd.experience_levels, EXPERIENCE_RANK) && <span style={chip('#f1f5f9', '#334155')}>Exp: {lowestOf(jd.experience_levels, EXPERIENCE_RANK)} or more</span>}
+                      {lowestOf(jd.qualifications, QUALIFICATION_RANK) && <span style={chip('#f1f5f9', '#334155')}>Min: {lowestOf(jd.qualifications, QUALIFICATION_RANK).split(' (')[0]}</span>}
                       {jd.salary_offered && <span style={chip('#f1f5f9', '#334155')}>₹ {jd.salary_offered}</span>}
                       {jd.openings && <span style={chip('#f1f5f9', '#334155')}>{jd.openings} openings</span>}
                     </div>
