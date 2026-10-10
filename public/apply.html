@@ -103,6 +103,17 @@
   .ms-opt:hover { background: #eef2ff; }
   .ms-opt input { width: 18px; height: 18px; accent-color: var(--indigo); }
 
+  /* language rows */
+  .lang { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; transition: border-color .2s, background .2s, box-shadow .2s; }
+  .lang.on { border-color: #a5b4fc; background: #f5f7ff; box-shadow: 0 8px 18px -14px rgba(79,70,229,.7); }
+  .lang-head { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 15px; font-weight: 600; }
+  .lang-head input { width: 18px; height: 18px; accent-color: var(--indigo); }
+  .lang-body { display: none; margin-top: 10px; }
+  .lang.on .lang-body { display: block; animation: rise .25s ease-out both; }
+  .lang-body label.sm { display: block; font-size: 12px; font-weight: 700; color: #334155; margin: 8px 0 5px; }
+  .lang-body input[type=text] { margin-top: 8px; }
+  .lang .err { margin-top: 6px; }
+
   .consent { display: flex; gap: 10px; align-items: flex-start; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 12px; padding: 12px; margin-top: 18px; font-size: 12.5px; color: #3730a3; line-height: 1.55; }
   .consent input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--indigo); flex-shrink: 0; }
 
@@ -174,18 +185,19 @@
         <div class="field">
           <label class="lbl" for="name">Full Name <span class="req">*</span></label>
           <input type="text" id="name" name="name" placeholder="e.g. Rahul Sharma" autocomplete="name" maxlength="100">
-          <div class="err" id="err-name">Please enter your full name.</div>
+          <div class="err" id="err-name">Please enter your full name (letters only, no numbers).</div>
         </div>
         <div class="grid2">
           <div class="field">
             <label class="lbl" for="age">Age <span class="req">*</span></label>
-            <input type="number" id="age" name="age" placeholder="e.g. 24" inputmode="numeric" min="16" max="65">
-            <div class="err" id="err-age">Please enter a valid age (16 - 65).</div>
+            <input type="number" id="age" name="age" placeholder="e.g. 24" inputmode="numeric" min="18" max="60">
+            <div class="err" id="err-age">Please enter a valid age (18 - 60).</div>
           </div>
           <div class="field">
             <label class="lbl" for="phone">Mobile Number (WhatsApp) <span class="req">*</span></label>
-            <input type="tel" id="phone" name="phone" placeholder="10-digit mobile number" inputmode="numeric" autocomplete="tel" maxlength="16">
-            <div class="err" id="err-phone">Please enter a valid 10-digit mobile number.</div>
+            <input type="tel" id="phone" name="phone" placeholder="10-digit mobile number" inputmode="numeric" autocomplete="tel" maxlength="16" pattern="[0-9]{10}">
+            <div class="hint" id="phoneHint">Enter exactly 10 digits (without +91)</div>
+            <div class="err" id="err-phone">Mobile number must be exactly 10 digits and start with 6, 7, 8 or 9.</div>
           </div>
         </div>
         <div class="field">
@@ -201,9 +213,9 @@
           <label class="lbl" for="qualification">Highest Qualification <span class="req">*</span></label>
           <select id="qualification">
             <option value="">-- Select your highest qualification --</option>
-            <option>12th (Higher Secondary / Intermediate)</option>
-            <option>UG (Undergraduate - Bachelor's Degree)</option>
-            <option>PG (Postgraduate - Master's Degree)</option>
+            <option>12th Pass (Higher Secondary / Intermediate)</option>
+            <option>Graduated (UG - Bachelor's Degree)</option>
+            <option>Post Graduated (PG - Master's Degree)</option>
           </select>
           <div class="err" id="err-qualification">Please select your highest qualification.</div>
         </div>
@@ -299,7 +311,7 @@
         <div class="field">
           <label class="lbl" for="location">Current Location <span class="req">*</span></label>
           <input type="text" id="location" placeholder="e.g. Rohini, Delhi" autocomplete="address-level2" maxlength="120">
-          <div class="err" id="err-location">Please enter your current location.</div>
+          <div class="err" id="err-location">Please enter your current area and city (e.g. Rohini, Delhi).</div>
         </div>
         <div class="field">
           <label class="lbl">Ready to Relocate in <span style="font-weight:500;color:#64748b">(tick all that apply)</span></label>
@@ -319,12 +331,33 @@
       </div>
 
       <div class="section">
-        <h2><span class="num">5</span> About your work</h2>
+        <h2><span class="num">5</span> Language skills</h2>
+        <div class="field">
+          <label class="lbl" for="english">English Proficiency <span class="req">*</span></label>
+          <select id="english">
+            <option value="">-- Select your English level --</option>
+            <option value="Beginner">Beginner - basic words and simple sentences</option>
+            <option value="Intermediate">Intermediate - can hold simple conversations</option>
+            <option value="Good">Good - can speak and write comfortably</option>
+            <option value="Advanced">Advanced - fluent, can handle customers confidently</option>
+            <option value="Excellent">Excellent - near-native fluency</option>
+          </select>
+          <div class="err" id="err-english">Please select your English proficiency.</div>
+        </div>
+        <div class="field">
+          <label class="lbl">Do you know any other language? <span style="font-weight:500;color:#64748b">(optional - tick all that apply)</span></label>
+          <div id="langList"></div>
+          <div class="hint">Foreign language knowledge can open special, higher-paying roles for you.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">6</span> About your work</h2>
         <div class="field">
           <label class="lbl" for="desc" id="descLabel">Brief description about your current job role <span class="req" id="descReq">*</span></label>
           <textarea id="desc" maxlength="1500" placeholder="Your responsibilities, process / domain, tools you use, languages you speak..."></textarea>
           <div class="hint"><span id="descCount">0</span> / 1500</div>
-          <div class="err" id="err-desc">Please write a short description (at least 10 characters).</div>
+          <div class="err" id="err-desc">Please write a proper description (at least 15 characters).</div>
         </div>
       </div>
 
@@ -377,7 +410,6 @@
     toggle('c-support', role === 'Customer Support');
     toggle('c-sales', role === 'Sales');
     var fresher = exp === 'Fresher';
-    $('descReq').style.display = fresher ? 'none' : 'inline';
     $('descLabel').firstChild.nodeValue = fresher ? 'Tell us about your studies, skills or internships ' : 'Brief description about your current job role ';
     $('desc').placeholder = fresher ? 'Your studies, skills, languages, internships or projects (optional)...' : 'Your responsibilities, process / domain, tools you use, languages you speak...';
     updateProgress();
@@ -402,12 +434,94 @@
   msPanel.addEventListener('change', refreshMs);
   document.addEventListener('click', function () { msPanel.classList.remove('open'); msBtn.setAttribute('aria-expanded', 'false'); });
 
+  // ----- phone: digits only, exactly 10 -----
+  function sanitizePhone() {
+    var d = $('phone').value.replace(/\D/g, '');
+    if (d.length === 12 && d.indexOf('91') === 0) d = d.slice(2);
+    if (d.length === 11 && d.charAt(0) === '0') d = d.slice(1);
+    d = d.slice(0, 10);
+    $('phone').value = d;
+    var h = $('phoneHint');
+    h.textContent = d.length === 10 ? '✓ 10 digits' : (d.length + ' / 10 digits - enter exactly 10 digits (without +91)');
+    h.style.color = d.length === 10 ? '#16a34a' : '';
+  }
+  $('phone').addEventListener('input', sanitizePhone);
+
+  // ----- other languages (with certificates) -----
+  var GENERIC_CERTS = ['No certificate yet (learning / self-learnt)', 'Certificate - A1 (Beginner)', 'Certificate - A2', 'Certificate - B1', 'Certificate - B2', 'Certificate - C1', 'Certificate - C2 (Proficient)', 'Other certificate'];
+  var LANGS = [
+    { name: 'German', certs: ['No certificate yet (learning / self-learnt)', 'Goethe-Zertifikat A1', 'Goethe-Zertifikat A2', 'Goethe-Zertifikat B1', 'Goethe-Zertifikat B2', 'Goethe-Zertifikat C1', 'Goethe-Zertifikat C2', 'telc Deutsch B1', 'telc Deutsch B2', 'TestDaF', 'Other certificate'] },
+    { name: 'French', certs: ['No certificate yet (learning / self-learnt)', 'DELF A1', 'DELF A2', 'DELF B1', 'DELF B2', 'DALF C1', 'DALF C2', 'TCF', 'TEF', 'Other certificate'] },
+    { name: 'Japanese', certs: ['No certificate yet (learning / self-learnt)', 'JLPT N5', 'JLPT N4', 'JLPT N3', 'JLPT N2', 'JLPT N1', 'NAT-TEST', 'J-TEST', 'Other certificate'] },
+    { name: 'Hebrew', certs: ['No certificate yet (learning / self-learnt)', 'Ulpan Aleph (Beginner)', 'Ulpan Bet (Elementary)', 'Ulpan Gimel (Intermediate)', 'Ulpan Dalet (Upper-Intermediate)', 'Ulpan Hey (Advanced)', 'Other certificate'] },
+    { name: 'Spanish', certs: ['No certificate yet (learning / self-learnt)', 'DELE A1', 'DELE A2', 'DELE B1', 'DELE B2', 'DELE C1', 'DELE C2', 'SIELE', 'Other certificate'] },
+    { name: 'Korean', certs: ['No certificate yet (learning / self-learnt)', 'TOPIK I - Level 1', 'TOPIK I - Level 2', 'TOPIK II - Level 3', 'TOPIK II - Level 4', 'TOPIK II - Level 5', 'TOPIK II - Level 6', 'Other certificate'] },
+    { name: 'Mandarin Chinese', certs: ['No certificate yet (learning / self-learnt)', 'HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'Other certificate'] },
+    { name: 'Italian', certs: GENERIC_CERTS },
+    { name: 'Dutch', certs: GENERIC_CERTS },
+    { name: 'Portuguese', certs: GENERIC_CERTS },
+    { name: 'Russian', certs: GENERIC_CERTS },
+    { name: 'Arabic', certs: GENERIC_CERTS },
+    { name: 'Other language', certs: GENERIC_CERTS, other: true }
+  ];
+
+  function buildLanguages() {
+    var list = $('langList');
+    LANGS.forEach(function (L, i) {
+      var row = document.createElement('div');
+      row.className = 'lang'; row.id = 'lang-' + i; row.setAttribute('data-i', i);
+      var opts = '<option value="">-- Select --</option>' + L.certs.map(function (c) { return '<option>' + c + '</option>'; }).join('');
+      row.innerHTML =
+        '<label class="lang-head"><input type="checkbox" class="lang-check"> <span>' + L.name + '</span></label>' +
+        '<div class="lang-body">' +
+          (L.other ? '<label class="sm">Which language? <span class="req" style="color:#dc2626">*</span></label><input type="text" class="lang-name" maxlength="40" placeholder="e.g. Thai, Polish, Turkish...">' : '') +
+          '<label class="sm">Which certificate do you currently have? <span class="req" style="color:#dc2626">*</span></label>' +
+          '<select class="lang-cert">' + opts + '</select>' +
+          '<input type="text" class="lang-other-cert" maxlength="60" placeholder="Type your certificate name / level" style="display:none">' +
+          '<div class="err">Please complete the details for this language.</div>' +
+        '</div>';
+      list.appendChild(row);
+    });
+  }
+  buildLanguages();
+
+  $('langList').addEventListener('change', function (e) {
+    var row = e.target.closest('.lang'); if (!row) return;
+    if (e.target.classList.contains('lang-check')) row.classList.toggle('on', e.target.checked);
+    if (e.target.classList.contains('lang-cert')) {
+      row.querySelector('.lang-other-cert').style.display = e.target.value === 'Other certificate' ? 'block' : 'none';
+    }
+    var er = row.querySelector('.err'); if (er) er.classList.remove('show');
+    updateProgress();
+  });
+
+  // returns { list: [...], badRow: id or null }
+  function collectLanguages() {
+    var list = [], badRow = null;
+    document.querySelectorAll('.lang').forEach(function (row, idx) {
+      var chk = row.querySelector('.lang-check');
+      var err = row.querySelector('.err'); err.classList.remove('show');
+      if (!chk.checked) return;
+      var L = LANGS[idx];
+      var name = L.other ? row.querySelector('.lang-name').value.trim() : L.name;
+      var cert = row.querySelector('.lang-cert').value;
+      var custom = row.querySelector('.lang-other-cert').value.trim();
+      var bad = false;
+      if (L.other && name.length < 2) bad = true;
+      if (!cert) bad = true;
+      if (cert === 'Other certificate') { if (custom.length < 2) bad = true; else cert = custom; }
+      if (bad) { err.classList.add('show'); if (!badRow) badRow = row.id; return; }
+      list.push({ language: name, certificate: cert });
+    });
+    return { list: list, badRow: badRow };
+  }
+
   // ----- progress bar -----
   function filled(id) { return $(id).value.trim() !== ''; }
   function updateProgress() {
     var exp = $('expType').value, role = $('role').value;
-    var checks = [filled('name'), filled('age'), filled('phone'), filled('email'), filled('qualification'), filled('expType'), filled('role'), filled('location'), $('consent').checked];
-    if (exp === 'Experienced') { checks.push(filled('totalExp'), filled('salary'), $('desc').value.trim().length >= 10); }
+    var checks = [filled('name'), filled('age'), $('phone').value.length === 10, filled('email'), filled('qualification'), filled('expType'), filled('role'), filled('location'), filled('english'), $('desc').value.trim().length >= 15, $('consent').checked];
+    if (exp === 'Experienced') { checks.push(filled('totalExp'), filled('salary')); }
     if (role === 'Others') checks.push(filled('roleOther'));
     if (role === 'Customer Support') checks.push(filled('supportType'));
     if (role === 'Sales') checks.push(filled('salesType'));
@@ -447,9 +561,9 @@
     function mark(id) { var r = fail(id); if (!first) first = id; return r; }
 
     var exp = $('expType').value, role = $('role').value;
-    if ($('name').value.trim().length < 2) mark('name');
+    if (!/^[\p{L}][\p{L} .'-]{1,98}$/u.test($('name').value.trim())) mark('name');
     var age = parseInt($('age').value, 10);
-    if (isNaN(age) || age < 16 || age > 65) mark('age');
+    if (isNaN(age) || age < 18 || age > 60) mark('age');
     if (!/^[6-9]\d{9}$/.test(normalizePhone($('phone').value))) mark('phone');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('email').value.trim())) mark('email');
     if (!$('qualification').value) mark('qualification');
@@ -460,8 +574,11 @@
     if (role === 'Customer Support' && !$('supportType').value) mark('supportType');
     if (role === 'Sales' && !$('salesType').value) mark('salesType');
     if (exp === 'Experienced' && !$('salary').value) mark('salary');
-    if ($('location').value.trim().length < 2) mark('location');
-    if (exp === 'Experienced' && $('desc').value.trim().length < 10) mark('desc');
+    if (!/\p{L}{3}/u.test($('location').value.trim())) mark('location');
+    if (!$('english').value) mark('english');
+    var langCheck = collectLanguages();
+    if (langCheck.badRow && !first) first = langCheck.badRow;
+    if ($('desc').value.trim().length < 15) mark('desc');
     if (!$('consent').checked) { $('err-consent').classList.add('show'); if (!first) first = 'consent'; }
 
     if (first) { var t = $(first); if (t && t.scrollIntoView) t.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -515,6 +632,8 @@
       current_salary: exp === 'Experienced' ? $('salary').value : null,
       current_location: $('location').value.trim(),
       relocate_cities: selectedCities(),
+      english_level: $('english').value,
+      languages: collectLanguages().list,
       description: $('desc').value.trim() || null,
       consent: true,
       source: source
