@@ -21,9 +21,9 @@ const JD_ROLES = ['Customer Support', 'Sales', 'Backend', 'Others'];
 const SUPPORT_TYPES = ['Voice', 'Non Voice', 'Blended'];
 const SALES_TYPES = ['Inbound Sales', 'Outbound Sales', 'Upselling'];
 const QUALIFICATION_OPTIONS = [
-  '12th (Higher Secondary / Intermediate)',
-  "UG (Undergraduate - Bachelor's Degree)",
-  "PG (Postgraduate - Master's Degree)"
+  '12th Pass (Higher Secondary / Intermediate)',
+  "Graduated (UG - Bachelor's Degree)",
+  "Post Graduated (PG - Master's Degree)"
 ];
 const EXPERIENCE_LEVELS = ['Fresher', '0 - 6 months', '6 months to 1 year', '1 year to 2 years', '2 years & above'];
 const RELOCATION_CITIES = ['Noida', 'Gurugram', 'Jaipur', 'Pune'];
@@ -47,6 +47,10 @@ const getExperienceBucket = (lead) => (lead.experience_type === 'Fresher' ? 'Fre
 // Higher number = more experienced / more qualified
 const EXPERIENCE_RANK = { 'Fresher': 0, '0 - 6 months': 1, '6 months to 1 year': 2, '1 year to 2 years': 3, '2 years & above': 4 };
 const QUALIFICATION_RANK = {
+  '12th Pass (Higher Secondary / Intermediate)': 0,
+  "Graduated (UG - Bachelor's Degree)": 1,
+  "Post Graduated (PG - Master's Degree)": 2,
+  // old labels (data saved before the rename) still work
   '12th (Higher Secondary / Intermediate)': 0,
   "UG (Undergraduate - Bachelor's Degree)": 1,
   "PG (Postgraduate - Master's Degree)": 2
@@ -75,6 +79,10 @@ const getOverNotes = (lead, jd) => {
   if (maxQual && (QUALIFICATION_RANK[lead.highest_qualification] ?? -1) > QUALIFICATION_RANK[maxQual]) notes.push('Higher qualification than asked');
   return notes;
 };
+
+const formatLanguages = (lead) => (Array.isArray(lead.languages) ? lead.languages : [])
+  .map(x => `${x.language}${x.certificate ? ` (${x.certificate})` : ''}`)
+  .join(', ');
 
 const onlyDigits = (v) => (v || '').toString().replace(/\D/g, '').slice(-10);
 
@@ -309,6 +317,9 @@ function JobsPanel({ userRole, userName, companyOptions }) {
           <div style={{ fontSize: '11px', color: '#334155', lineHeight: '1.7' }}>
             <div>📞 {lead.phone || 'N/A'} &nbsp; ✉️ {lead.email || 'N/A'}</div>
             <div>💼 {getExperienceBucket(lead)}{lead.current_salary ? ` • ₹${lead.current_salary}` : ''}</div>
+            {(lead.english_level || formatLanguages(lead)) && (
+              <div>🗣️ {lead.english_level ? `English: ${lead.english_level}` : ''}{lead.english_level && formatLanguages(lead) ? ' • ' : ''}{formatLanguages(lead)}</div>
+            )}
             <div>🧩 {lead.job_role === 'Others' ? (lead.role_other || 'Others') : lead.job_role}{lead.support_type ? ` • ${lead.support_type}` : ''}{lead.sales_type ? ` • ${lead.sales_type}` : ''}</div>
             <div>📍 {lead.current_location}{(lead.relocate_cities || []).length > 0 ? ` • Open to: ${lead.relocate_cities.join(', ')}` : ''}</div>
             <div style={{ color: '#94a3b8', fontSize: '10px' }}>Submitted {formatDate(lead.created_at)}{lead.source ? ` • via ${lead.source}` : ''}</div>
@@ -567,13 +578,14 @@ function JobsPanel({ userRole, userName, companyOptions }) {
             <p style={{ color: '#64748b', fontSize: '13px' }}>No candidate responses found.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', minWidth: '760px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', minWidth: '900px' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', textAlign: 'left', color: '#475569' }}>
                     <th style={{ padding: '8px' }}>Candidate</th>
                     <th style={{ padding: '8px' }}>Contact</th>
                     <th style={{ padding: '8px' }}>Role</th>
                     <th style={{ padding: '8px' }}>Experience / Salary</th>
+                    <th style={{ padding: '8px' }}>English / Languages</th>
                     <th style={{ padding: '8px' }}>Location</th>
                     <th style={{ padding: '8px' }}>Matches JDs</th>
                     <th style={{ padding: '8px' }}>Submitted</th>
@@ -592,6 +604,7 @@ function JobsPanel({ userRole, userName, companyOptions }) {
                         <td style={{ padding: '8px' }}>📞 {l.phone || 'N/A'}<br />✉️ {l.email || 'N/A'}</td>
                         <td style={{ padding: '8px' }}>{l.job_role === 'Others' ? (l.role_other || 'Others') : l.job_role}{l.support_type ? ` • ${l.support_type}` : ''}{l.sales_type ? ` • ${l.sales_type}` : ''}</td>
                         <td style={{ padding: '8px' }}>{getExperienceBucket(l)}{l.current_salary ? <><br />₹{l.current_salary}</> : ''}</td>
+                        <td style={{ padding: '8px' }}>{l.english_level ? `English: ${l.english_level}` : <span style={{ color: '#94a3b8' }}>-</span>}{formatLanguages(l) ? <><br /><span style={{ color: '#4338ca' }}>{formatLanguages(l)}</span></> : ''}</td>
                         <td style={{ padding: '8px' }}>{l.current_location}{(l.relocate_cities || []).length > 0 ? <><br /><span style={{ color: '#64748b' }}>Open to: {l.relocate_cities.join(', ')}</span></> : ''}</td>
                         <td style={{ padding: '8px' }}>{matched.length === 0 ? <span style={{ color: '#94a3b8' }}>None yet</span> : matched.map(m => <span key={m.id} style={chip('#e0e7ff', '#3730a3')}>{m.title}</span>)}</td>
                         <td style={{ padding: '8px', color: '#64748b' }}>{formatDate(l.created_at)}{l.source ? <><br />via {l.source}</> : ''}</td>
